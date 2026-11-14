@@ -21,7 +21,7 @@ export default function Cochlea({ ear, statuses, selected, onSelect, size = 300 
   const geom = {
     cx: size / 2,
     cy: size / 2,
-    rOuter: size * 0.44,
+    rOuter: size * 0.4,
     rInner: size * 0.06,
     startAngle: ear === 'left' ? 0 : Math.PI,
     direction: mirror,
@@ -56,8 +56,8 @@ export default function Cochlea({ ear, statuses, selected, onSelect, size = 300 
           </g>
         );
       })}
-      <text x={base.x} y={base.y + (ear === 'left' ? -14 : 18)} className="cochlea-end" textAnchor="middle">
-        base · high pitch
+      <text x={base.x} y={base.y + 20} className="cochlea-end" textAnchor="middle">
+        base
       </text>
       <text x={size / 2} y={size / 2 + 4} className="cochlea-end" textAnchor="middle">
         apex

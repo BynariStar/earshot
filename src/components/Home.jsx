@@ -6,6 +6,7 @@ import { averageBaselines, shifts, regionStatus, FREQUENCIES } from '../lib/rule
 import { REGION_INFO } from '../lib/cochlea.js';
 import { explain } from '../lib/advice.js';
 import { baselineTests, latestCheck } from '../lib/storage.js';
+import Trend from './Trend.jsx';
 
 const STATUS_TEXT = {
   untested: 'Not tested yet',
@@ -15,7 +16,7 @@ const STATUS_TEXT = {
   urgent: 'Urgent: 30 dB or more worse than your baseline',
 };
 
-export default function Home({ data, onStartTest }) {
+export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
   const [selected, setSelected] = useState({ ear: 'right', frequency: 4000 });
   const baselines = baselineTests(data);
   const check = latestCheck(data);
@@ -41,6 +42,12 @@ export default function Home({ data, onStartTest }) {
 
   return (
     <section className="home">
+      {data.demo && (
+        <div className="demo-banner">
+          <strong>Demo astronaut: simulated data, not a real person.</strong> The pattern follows NASA's reported in-flight
+          low-frequency shifts. <button className="link-button" onClick={onExitDemo}>Exit demo</button>
+        </div>
+      )}
       <div className="home-intro">
         <h1>Your inner ear, by pitch</h1>
         <p>
@@ -50,7 +57,14 @@ export default function Home({ data, onStartTest }) {
         <button className="primary" onClick={() => onStartTest(callToAction.role)}>
           {callToAction.label}
         </button>
-        {check && <p className="muted">Last check: {new Date(check.date).toLocaleString()}</p>}
+        {!data.demo && data.tests.length === 0 && (
+          <button className="link-button" onClick={onLoadDemo}>or explore with a simulated demo astronaut</button>
+        )}
+        {check && (
+          <p className="muted">
+            Last check: {Number.isFinite(check.missionDay) ? `mission day ${check.missionDay}` : new Date(check.date).toLocaleString()}
+          </p>
+        )}
       </div>
 
       {findings.length > 0 && (
@@ -87,6 +101,7 @@ export default function Home({ data, onStartTest }) {
           <p>{info.nasa}</p>
         </aside>
       </div>
+      <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
       <div className="legend">
         {['ok', 'watch', 'shift', 'urgent', 'untested'].map((s) => (
           <span key={s} className={`legend-item ${s}`}>{STATUS_TEXT[s].split(':')[0]}</span>

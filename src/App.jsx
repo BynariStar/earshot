@@ -5,7 +5,8 @@ import Home from './components/Home.jsx';
 import TestFlow from './components/TestFlow.jsx';
 import Station from './components/Station.jsx';
 import About from './components/About.jsx';
-import { load, save } from './lib/storage.js';
+import { load, save, clearAll } from './lib/storage.js';
+import { demoState } from './lib/demo.js';
 import './App.css';
 
 export default function App() {
@@ -42,7 +43,21 @@ export default function App() {
         </nav>
       </header>
       <main>
-        {view.name === 'home' && <Home data={data} onStartTest={(role) => setView({ name: 'test', role })} />}
+        {view.name === 'home' && (
+          <Home
+            data={data}
+            onStartTest={(role) => setView({ name: 'test', role })}
+            onLoadDemo={() => {
+              const d = demoState();
+              save(d);
+              setData(d);
+            }}
+            onExitDemo={() => {
+              clearAll();
+              setData(load());
+            }}
+          />
+        )}
         {view.name === 'test' && <TestFlow role={view.role} data={data} onSave={saveTest} onDone={() => setView({ name: 'home' })} />}
         {view.name === 'station' && <Station />}
         {view.name === 'about' && <About data={data} onReset={() => setData(load())} />}

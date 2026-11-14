@@ -116,3 +116,20 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
   .slider { grid-template-columns: 1fr 110px 48px; }
   .heard-button { width: 200px; height: 200px; }
 }
+
+.demo-banner { background: rgba(242, 201, 76, 0.12); border: 1px solid var(--watch); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; }
+.trend { margin: 20px 0 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+.trend figcaption { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
+.trend svg { width: 100%; height: auto; }
+.trend .grid { stroke: var(--border); }
+.trend .rule { stroke: var(--shift); stroke-dasharray: 5 4; }
+.trend .rule-label { fill: var(--shift); }
+.trend .axis { fill: var(--muted); font-size: 10px; }
+.trend-series path { fill: none; stroke-width: 2; }
+.trend-series.s1 path, .trend-series.s1 circle { stroke: #6ea8ff; } .trend-series.s1 circle { fill: #6ea8ff; }
+.trend-series.s2 path, .trend-series.s2 circle { stroke: #a78bfa; } .trend-series.s2 circle { fill: #a78bfa; }
+.trend-series.s3 path, .trend-series.s3 circle { stroke: #3ccf8e; } .trend-series.s3 circle { fill: #3ccf8e; }
+.trend-series.s4 path, .trend-series.s4 circle { stroke: #f2c94c; } .trend-series.s4 circle { fill: #f2c94c; }
+.trend-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.trend-key::before { content: ''; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: 3px; }
+.trend-key.s1::before { background: #6ea8ff; } .trend-key.s2::before { background: #a78bfa; } .trend-key.s3::before { background: #3ccf8e; } .trend-key.s4::before { background: #f2c94c; }

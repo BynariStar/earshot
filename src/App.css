@@ -133,3 +133,13 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 .trend-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
 .trend-key::before { content: ''; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: 3px; }
 .trend-key.s1::before { background: #6ea8ff; } .trend-key.s2::before { background: #a78bfa; } .trend-key.s3::before { background: #3ccf8e; } .trend-key.s4::before { background: #f2c94c; }
+
+.crosscheck { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+.crosscheck-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; }
+.crosscheck .band { fill: rgba(60, 207, 142, 0.1); }
+.crosscheck .baseline { stroke: var(--ok); stroke-dasharray: 4 3; }
+.crosscheck .dot { fill: var(--accent); }
+.verdict { border-left: 4px solid var(--ok); padding: 8px 12px; background: var(--surface-2); border-radius: 8px; }
+.verdict.watch { border-left-color: var(--watch); }
+.verdict.shift { border-left-color: var(--shift); }
+@media (max-width: 900px) { .crosscheck-grid { grid-template-columns: 1fr; } }

@@ -7,6 +7,7 @@ import { REGION_INFO } from '../lib/cochlea.js';
 import { explain } from '../lib/advice.js';
 import { baselineTests, latestCheck } from '../lib/storage.js';
 import Trend from './Trend.jsx';
+import CrossCheck from './CrossCheck.jsx';
 
 const STATUS_TEXT = {
   untested: 'Not tested yet',
@@ -107,6 +108,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
           <span key={s} className={`legend-item ${s}`}>{STATUS_TEXT[s].split(':')[0]}</span>
         ))}
       </div>
+      <CrossCheck hearingFindings={findings} />
     </section>
   );
 }

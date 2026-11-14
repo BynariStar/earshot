@@ -1,3 +1,5 @@
+// AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
+// Reviewed and directed by the team. See AI_USE.md.
 // Noise exposure math, following NASA's own definitions.
 //
 // - 24-hour noise dose: NASA-STD-3001 Vol. 2 Rev F, requirement [V2 6115]:

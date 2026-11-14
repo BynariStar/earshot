@@ -1,3 +1,5 @@
+// AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
+// Reviewed and directed by the team. See AI_USE.md.
 // Tone output through the Web Audio API, routed to one ear only.
 // Pulsed tones (three 225 ms beeps) are easier to tell apart from tinnitus than a steady tone.
 import { MAX_LEVEL } from './threshold.js';

@@ -25,5 +25,6 @@
     "globals": "^16.0.0",
     "vite": "^6.3.5",
     "vitest": "^3.2.4"
-  }
+  },
+  "description": "Astronaut hearing self-check and noise coach built on NASA rules and data (NASA Space Apps 2026). Code largely AI-generated with Claude, reviewed by the team; see AI_USE.md."
 }

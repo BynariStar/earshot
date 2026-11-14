@@ -1,3 +1,5 @@
+// AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
+// Reviewed and directed by the team. See AI_USE.md.
 import { describe, it, expect } from 'vitest';
 import { allowedMinutes, dose, leq, withProtection, workdayStatus, seriesToSegments, EARPLUG_EFFECTIVE_DB } from './noise.js';
 import { evaluate, confirm, averageBaselines, baselineAgreement, regionStatus } from './rules.js';

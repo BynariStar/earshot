@@ -1,3 +1,5 @@
+// AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
+// Reviewed and directed by the team. See AI_USE.md.
 // Threshold search: a simplified modified Hughson-Westlake procedure ("down 10, up 5"),
 // the standard manual audiometry method. Levels are on the app's own scale in dB, where
 // 100 = digital full scale; the output cap keeps every tone at or below MAX_LEVEL.

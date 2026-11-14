@@ -1,3 +1,5 @@
+// AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
+// Reviewed and directed by the team. See AI_USE.md.
 // NASA hearing-shift rules, applied to change from the astronaut's own baseline on the same headphones.
 //
 // Definitions from NASA's Human System Risk Board hearing-loss risk record (Rev B.1, 2025):

@@ -18,7 +18,7 @@ const STATUS_TEXT = {
 };
 
 export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
-  const [selected, setSelected] = useState({ ear: 'right', frequency: 4000 });
+  const [selected, setSelected] = useState({ ear: 'left', frequency: 4000 });
   const baselines = baselineTests(data);
   const check = latestCheck(data);
   const reference = baselines.length >= 2 ? averageBaselines(baselines[0].thresholds, baselines[1].thresholds) : null;
@@ -84,7 +84,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
       )}
 
       <div className="ears">
-        {['right', 'left'].map((ear) => (
+        {['left', 'right'].map((ear) => (
           <figure key={ear} className="ear">
             <Cochlea ear={ear} statuses={statusByEar[ear]} selected={selected} onSelect={setSelected} />
             <figcaption>{ear === 'right' ? 'Right ear' : 'Left ear'}</figcaption>

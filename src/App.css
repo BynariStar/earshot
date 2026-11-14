@@ -22,10 +22,12 @@ main { padding: 24px 0 40px; }
 .ear { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 8px; text-align: center; }
 .ear figcaption { color: var(--muted); font-size: 0.9rem; padding-bottom: 6px; }
 .cochlea { width: 100%; height: auto; display: block; }
-.cochlea-tube { fill: none; stroke: var(--tube); stroke-width: 14; stroke-linecap: round; }
-.cochlea-region { fill: none; stroke-width: 14; stroke-linecap: round; cursor: pointer; transition: stroke-width 0.15s; outline: none; }
-.cochlea-region:hover, .cochlea-region:focus-visible { stroke-width: 18; }
-.cochlea-region.selected { stroke-width: 20; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.5)); }
+.cochlea-shell { stroke: rgba(255,255,255,0.08); stroke-width: 1; }
+.cochlea-stem { fill: var(--shell-out); stroke: rgba(255,255,255,0.08); }
+.cochlea-duct { fill: none; stroke: rgba(255,255,255,0.12); stroke-width: 1; stroke-dasharray: 2 3; }
+.cochlea-region { stroke: rgba(8, 12, 24, 0.6); stroke-width: 1; cursor: pointer; opacity: 0.92; transition: opacity 0.15s; outline: none; }
+.cochlea-region:hover, .cochlea-region:focus-visible { opacity: 1; stroke: #fff; }
+.cochlea-region.selected { opacity: 1; stroke: #fff; stroke-width: 2; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.55)); }
 .cochlea-label { fill: var(--text); font-size: 11px; font-weight: 600; pointer-events: none; }
 .cochlea-end { fill: var(--muted); font-size: 9px; }
 .region-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }

@@ -13,6 +13,8 @@
   --urgent: #eb5757;
   --region-untested: #3a4672;
   --tube: #26304f;
+  --shell-in: #4a3f5e;
+  --shell-out: #2b3352;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   color: var(--text);

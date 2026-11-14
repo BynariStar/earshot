@@ -5,6 +5,7 @@ import Home from './components/Home.jsx';
 import TestFlow from './components/TestFlow.jsx';
 import Station from './components/Station.jsx';
 import About from './components/About.jsx';
+import IsThisNormal from './components/IsThisNormal.jsx';
 import { load, save, clearAll } from './lib/storage.js';
 import { demoState } from './lib/demo.js';
 import './App.css';
@@ -23,6 +24,7 @@ export default function App() {
 
   const nav = [
     ['home', 'My ears'],
+    ['normal', 'Is this normal?'],
     ['station', 'Station noise'],
     ['about', 'Sources'],
   ];
@@ -31,7 +33,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <button className="brand" onClick={() => setView({ name: 'home' })}>
-          <span className="brand-mark" aria-hidden="true" />
+          <img className="brand-mark" src="./favicon.svg" alt="" aria-hidden="true" />
           Earshot
         </button>
         <nav>
@@ -52,6 +54,7 @@ export default function App() {
               save(d);
               setData(d);
             }}
+            onOpenNormal={() => setView({ name: 'normal' })}
             onExitDemo={() => {
               clearAll();
               setData(load());
@@ -59,6 +62,7 @@ export default function App() {
           />
         )}
         {view.name === 'test' && <TestFlow role={view.role} data={data} onSave={saveTest} onDone={() => setView({ name: 'home' })} />}
+        {view.name === 'normal' && <IsThisNormal data={data} onStartTest={() => setView({ name: 'test', role: 'baseline' })} />}
         {view.name === 'station' && <Station />}
         {view.name === 'about' && <About data={data} onReset={() => setData(load())} />}
       </main>

@@ -7,7 +7,8 @@ import { REGION_INFO } from '../lib/cochlea.js';
 import { explain } from '../lib/advice.js';
 import { baselineTests, latestCheck } from '../lib/storage.js';
 import Trend from './Trend.jsx';
-import CrossCheck from './CrossCheck.jsx';
+import ContextStrip from './ContextStrip.jsx';
+import { compareAll, contextInputs, bandOf } from '../lib/context.js';
 
 const STATUS_TEXT = {
   untested: 'Not tested yet',
@@ -17,7 +18,7 @@ const STATUS_TEXT = {
   urgent: 'Urgent: 30 dB or more worse than your baseline',
 };
 
-export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
+export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpenNormal }) {
   const [selected, setSelected] = useState({ ear: 'left', frequency: 4000 });
   const baselines = baselineTests(data);
   const check = latestCheck(data);
@@ -32,6 +33,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
   }, [reference, check]);
 
   const findings = check?.confirmedFindings ?? [];
+  const inputs = contextInputs(data);
   const info = REGION_INFO[selected.frequency];
   const status = statusByEar[selected.ear]?.[selected.frequency] ?? 'untested';
   const delta = statusByEar.raw?.[selected.ear]?.perFreq?.[selected.frequency];
@@ -77,6 +79,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
                 <h3>{e.title}</h3>
                 <p>{e.what}</p>
                 <ul>{e.actions.map((a) => <li key={a}>{a}</li>)}</ul>
+                {f.kind !== 'sudden' && <ContextStrip rows={compareAll(f.averageDb, f.kind, inputs)} onMore={onOpenNormal} />}
               </article>
             );
           })}
@@ -100,6 +103,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
           <p>{info.hears}</p>
           <h3>What NASA knows</h3>
           <p>{info.nasa}</p>
+          {Number.isFinite(delta) && delta >= 5 && <ContextStrip rows={compareAll(delta, bandOf(selected.frequency), inputs)} onMore={onOpenNormal} />}
         </aside>
       </div>
       <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
@@ -108,7 +112,6 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo }) {
           <span key={s} className={`legend-item ${s}`}>{STATUS_TEXT[s].split(':')[0]}</span>
         ))}
       </div>
-      <CrossCheck hearingFindings={findings} />
     </section>
   );
 }

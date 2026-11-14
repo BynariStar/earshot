@@ -4,6 +4,7 @@
 // appearing during a long mission in one ear) mirrors what NASA reports: low-frequency shifts in
 // about 40% of in-flight tests (Human System Risk Board hearing-loss risk record, Rev B.1, 2025).
 import { evaluate, averageBaselines } from './rules.js';
+import pret from '../data/pret_lnsat.json';
 
 const base = {
   left: { 250: 30, 500: 25, 1000: 20, 2000: 20, 3000: 25, 4000: 30 },
@@ -44,5 +45,17 @@ export function demoState(launch = new Date()) {
     const ev = evaluate(reference, t.thresholds);
     t.confirmedFindings = ev.findings; // in the demo the retest is assumed to repeat the result
   }
-  return { profile: { headphones: 'Demo headphones', demo: true }, tests, context: [], demo: true };
+  // Thinking-test history: REAL scores of CSA PRET volunteer #35 (10 sessions in 2015), placed on this
+  // simulated mission's timeline for the demo. Pairing them with the simulated hearing record is illustrative.
+  const volunteer = pret.people.find((p) => p.participant === 35);
+  const days = [-30, -29, 10, 20, 35, 50, 62, 75, 95, 105];
+  const cognition = volunteer.sessions.map((s, i) => ({ missionDay: days[i], level: s.highestLevelPassed, source: `CSA PRET volunteer #35, session ${s.session} (${s.date})` }));
+  return {
+    profile: { headphones: 'Demo headphones', demo: true, age: 47, sex: 'male' },
+    tests,
+    context: [],
+    demo: true,
+    cognition,
+    plannedDay: { leqDba: 72.8, status: 'protection-required', note: "NASA's worked example day: one treadmill hour without earplugs" },
+  };
 }

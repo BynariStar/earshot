@@ -1,6 +1,6 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import iss from '../data/iss_modules.json';
 import lmlstp from '../data/lmlstp.json';
 import { dose, withProtection, workdayStatus, sleepStatus, biggestContributors, LIMITS, EARPLUG_EFFECTIVE_DB } from '../lib/noise.js';
@@ -47,6 +47,13 @@ export default function Station() {
   }, [hours, t2Minutes, earplugs]);
 
   const work = workdayStatus(day);
+  useEffect(() => {
+    try {
+      localStorage.setItem('earshot.plannedDay', JSON.stringify({ leqDba: work.leqDba, status: work.status }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [work.leqDba, work.status]);
   const sleepModule = sleepModules.find((m) => m.id === sleepAt);
   const sleep = sleepStatus([{ dba: sleepModule.dba, minutes: 480 }]);
   const day24 = [...day, { dba: sleepModule.dba, minutes: 480 }];

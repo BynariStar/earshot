@@ -118,3 +118,22 @@ describe('threshold search', () => {
     expect(close / runs).toBeGreaterThan(0.85);
   });
 });
+
+import { ageSlopeDbPerYear, pretPopulation, testErrorComparison, compareAll } from './context.js';
+describe('dataset comparisons', () => {
+  it('derives about 1 dB/year at 6 kHz for a 47-year-old male astronaut from NASA LSAH', () => {
+    expect(ageSlopeDbPerYear(47, 'male')).toBeCloseTo((30.84 - 25.47) / 5, 2);
+  });
+  it('finds 6 of 320 later CSA PRET sessions with a 2-level drop', () => {
+    const p = pretPopulation();
+    expect(p.later).toBe(320);
+    expect(p.drops).toBe(6);
+  });
+  it('treats 10 dB as beyond test error', () => {
+    expect(testErrorComparison(10).level).toBe('flag');
+    expect(testErrorComparison(4).level).toBe('ok');
+  });
+  it('returns five comparisons for a band change', () => {
+    expect(compareAll(12, 'high', { age: 47, sex: 'male', years: 0.5, day: null, cognition: null, hearingShift: true })).toHaveLength(5);
+  });
+});

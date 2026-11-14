@@ -14,6 +14,8 @@ export default function TestFlow({ role, data, onSave, onDone }) {
   const profile = data.profile ?? {};
   const [stage, setStage] = useState('setup'); // setup | running | retest-offer | retesting | result
   const [headphones, setHeadphones] = useState(profile.headphones ?? '');
+  const [age, setAge] = useState(profile.age ?? '');
+  const [sex, setSex] = useState(profile.sex ?? '');
   const [noise, setNoise] = useState(null);
   const [volumeSet, setVolumeSet] = useState(false);
   const [context, setContext] = useState([]);
@@ -43,7 +45,7 @@ export default function TestFlow({ role, data, onSave, onDone }) {
     if (role === 'baseline') {
       const test = record(result);
       const problems = baselines.length === 1 ? baselineAgreement(baselines[0].thresholds, result.thresholds) : [];
-      onSave(test, { headphones: headphones.trim() });
+      onSave(test, { headphones: headphones.trim(), ...(age ? { age: Number(age) } : {}), ...(sex ? { sex } : {}) });
       setOutcome({ kind: 'baseline', number: baselines.length + 1, problems, falseAlarms: result.falseAlarms });
       setStage('result');
       return;
@@ -165,6 +167,20 @@ export default function TestFlow({ role, data, onSave, onDone }) {
         <li>
           <NoiseCheck onResult={setNoise} />
         </li>
+        {role === 'baseline' && (
+          <li>
+            <p>Optional: your age and sex let Earshot compare changes with NASA's astronaut hearing-by-age data. Stored on this device only.</p>
+            <label className="inline">Age <input type="number" min="18" max="90" value={age} onChange={(e) => setAge(e.target.value)} style={{ width: 80 }} /></label>
+            <label className="inline">
+              Sex
+              <select value={sex} onChange={(e) => setSex(e.target.value)}>
+                <option value="">Prefer not to say</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+              </select>
+            </label>
+          </li>
+        )}
         {role !== 'baseline' && (
           <li>
             <p>Anything since your last check? (optional)</p>

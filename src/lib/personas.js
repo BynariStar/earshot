@@ -52,7 +52,7 @@ export const PERSONAS = [
   },
   {
     id: 'sudden', name: 'Crew member D', tag: 'Sudden drop ahead', age: 52, sex: 'female',
-    story: 'Steady until today. In the app, choose Demo, then Ringing in the right ear, to see the sudden-drop response.',
+    story: 'Steady until today. In the app, choose Demo, then Report ringing in the right ear, to see the sudden-drop response.',
     state: () => build([[-30, 'baseline', {}], [-29, 'baseline', {}], [45, 'check', {}]]),
     truth: {},
     afterRinging: { right: { 1000: 15, 2000: 35, 3000: 40, 4000: 35 } },

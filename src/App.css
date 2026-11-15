@@ -964,3 +964,5 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 .scenario-note { display: block; margin-top: 2px; }
 .app main > .panel { max-width: 780px; margin-left: auto; margin-right: auto; }
 .quick-actions-row { margin-top: 16px; }
+.choice.with-icon .choice-icon { color: var(--accent); margin-bottom: 4px; }
+.choice.own { border-style: solid; }

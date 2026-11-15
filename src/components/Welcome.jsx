@@ -38,26 +38,25 @@ export default function Welcome({ onStart, initial, onAbout, onExplore }) {
         ))}
       </div>
 
-      <h2>Me</h2>
-      <div className="choice-grid">
-        <button className={`choice own${persona === 'own' ? ' on' : ''}`} onClick={() => setPersona('own')}>
-          <strong>Take my own baseline</strong>
-          <span className="muted small">Two 8-minute tests on your own wired headphones, in a quiet room. Results stay on this device.</span>
-        </button>
-      </div>
-
-      <h2>Or choose a simulation</h2>
-      <p className="muted small section-note">Built from NASA's published hearing statistics. Not real people.</p>
+      <h2>Choose a simulation</h2>
+      <p className="muted small section-note">Crew members built from NASA's published hearing statistics (not real people), or your own ears.</p>
       <div className="choice-grid">
         {PERSONAS.map((p) => (
-          <button key={p.id} className={`choice${persona === p.id ? ' on' : ''}`} onClick={() => setPersona(p.id)}>
+          <button key={p.id} className={`choice with-icon${persona === p.id ? ' on' : ''}`} onClick={() => setPersona(p.id)}>
+            <ChoiceIcon name={p.id} />
             <strong>{p.name} · {p.tag}</strong>
             <span className="muted small">{p.story}</span>
           </button>
         ))}
-        <button className={`choice own${persona === 'custom' ? ' on' : ''}`} onClick={() => setPersona('custom')}>
+        <button className={`choice with-icon own${persona === 'custom' ? ' on' : ''}`} onClick={() => setPersona('custom')}>
+          <ChoiceIcon name="custom" />
           <strong>Build your own</strong>
           <span className="muted small">Choose age, sex and what's happening to their ears.</span>
+        </button>
+        <button className={`choice with-icon own${persona === 'own' ? ' on' : ''}`} onClick={() => setPersona('own')}>
+          <ChoiceIcon name="own" />
+          <strong>Take my own baseline</strong>
+          <span className="muted small">Two 8-minute tests on your own wired headphones, in a quiet room. Results stay on this device.</span>
         </button>
       </div>
       {persona === 'custom' && (
@@ -99,5 +98,22 @@ export default function Welcome({ onStart, initial, onAbout, onExplore }) {
         <button className="secondary" onClick={onAbout}>Sources and disclosures</button>
       </p>
     </div>
+  );
+}
+
+// One simple line icon per choice: steady, high-pitch change, low-pitch change, sudden drop, build your own, own ears.
+const ICONS = {
+  steady: <><path d="M3 12h4l2-3 3 6 2-3h7" /></>,
+  high: <><path d="M3 15c2 0 2-6 4-6s2 6 4 6 2-6 4-6 2 6 4 6" /><path d="M18 3l3 3-3 3M21 6h-5" /></>,
+  low: <><path d="M3 12c3 0 3-5 6-5s3 10 6 10 3-5 6-5" /><path d="M6 20h12" /></>,
+  sudden: <><path d="M3 6h7l3 12h8" /><path d="M17 14l4 4-4 4" /></>,
+  custom: <><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></>,
+  own: <><path d="M4 15v-3a8 8 0 0 1 16 0v3" /><rect x="3" y="14" width="5" height="7" rx="2" /><rect x="16" y="14" width="5" height="7" rx="2" /></>,
+};
+function ChoiceIcon({ name }) {
+  return (
+    <svg className="choice-icon" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {ICONS[name]}
+    </svg>
   );
 }

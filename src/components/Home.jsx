@@ -64,8 +64,8 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpen
     <section className="home">
       {data.demo && (
         <div className="demo-banner">
-          <strong>Demo astronaut: simulated data, not a real person.</strong> The pattern follows NASA's reported in-flight
-          low-frequency shifts. <button className="link-button" onClick={onExitDemo}>Exit demo</button>
+          <strong>Simulated crew member: not a real person.</strong> Built from NASA's published statistics.{' '}
+          <button className="link-button" onClick={onExitDemo}>Change</button>
         </div>
       )}
       <div className="home-intro">
@@ -76,14 +76,14 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpen
         </p>
         {data.demo ? (
           <button className="primary" onClick={onExitDemo}>
-            Exit demo to test yourself
+            Switch to my own ears
           </button>
         ) : (
           <button className="primary" onClick={() => onStartTest(callToAction.role)}>
             {callToAction.label}
           </button>
         )}
-        {!data.demo && data.tests.length === 0 && (
+        {onLoadDemo && !data.demo && data.tests.length === 0 && (
           <button className="link-button" onClick={onLoadDemo}>or explore with a simulated demo astronaut</button>
         )}
         {check && (

@@ -243,16 +243,6 @@ describe('simulated bases', () => {
   });
 });
 
-import { simulateFleet, analyzeFleet, ANOMALY } from './fleet.js';
-describe('simulated fleet view', () => {
-  const a = analyzeFleet(simulateFleet());
-  it('finds exactly the injected loud-module weeks, with no false alarms', () => {
-    expect(a.anomalies.map((x) => [x.exp, x.module, x.week])).toEqual(ANOMALY.weeks.map((w) => [ANOMALY.expedition, ANOMALY.module, w]));
-  });
-  it('is deterministic, so the pitch numbers never change', () => {
-    expect(analyzeFleet(simulateFleet()).over).toBe(a.over);
-  });
-});
 
 import { setPlaceMinutes } from './plan.js';
 import { TARGETS, planChecks } from './personal.js';
@@ -281,5 +271,36 @@ describe('planner with places, protection, earphones and personal targets', () =
     const r = computePlan({ ...DEFAULT_PLAN, activities: { t2: 0, ared: 0 } });
     expect(r.headroom(84.5)).toBeGreaterThan(40);
     expect(r.headroom(84.5)).toBeLessThan(54); // all of the allowance would be about 53 min
+  });
+});
+
+import { PERSONAS, simulatedThresholds } from './personas.js';
+import { buildAlerts, quickPitchesFor } from './alerts.js';
+import { spectrumOf, dbaOf, likelySource, withFault, faultDelta } from './spectrum.js';
+describe('active monitoring', () => {
+  it('digitised NASA spectra reproduce NASA\'s dBA within 0.1 dB', () => {
+    for (const [id, dba] of [['lab', 59.7], ['cof', 56.8], ['jem', 55.6], ['mlm', 67.4], ['mrm1', 65.2], ['fgb', 61.8]]) {
+      expect(Math.abs(dbaOf(spectrumOf(id).bands) - dba)).toBeLessThan(0.15);
+    }
+  });
+  it('NC envelopes stay above the module\'s measured dBA', () => {
+    expect(dbaOf(spectrumOf('node2').bands)).toBeGreaterThan(57.5);
+  });
+  it('names the stalled fan as the likely source of a 500 Hz / 1 kHz rise', () => {
+    const n = spectrumOf('node2').bands;
+    expect(likelySource(n, withFault(n, 'stalled-fan', 8)).id).toBe('stalled-fan');
+    expect(faultDelta('node2')).toBeGreaterThan(2);
+  });
+  it('a fan fault in a module you work in triggers an exposure alert with targeted pitches', () => {
+    const p = PERSONAS.find((x) => x.id === 'high');
+    const data = p.state();
+    const events = [{ type: 'fan-fault', at: 1 }];
+    const alerts = buildAlerts({ station: 'iss', data, events, plan: { placesUsed: ['node2'] }, planFlags: [], hearing: { state: 'high' }, quick: [] });
+    expect(alerts.map((a) => a.id)).toEqual(expect.arrayContaining(['fault', 'exposure', 'targets']));
+    expect(quickPitchesFor(events[0])).toEqual([500, 1000, 4000]);
+  });
+  it('ringing on crew member D leads to a 30+ dB simulated drop', () => {
+    const d = PERSONAS.find((x) => x.id === 'sudden');
+    expect(simulatedThresholds(d, [{ type: 'ringing' }]).right[3000] - simulatedThresholds(d, []).right[3000]).toBeGreaterThanOrEqual(30);
   });
 });

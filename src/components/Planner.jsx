@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { noiseColor } from '../lib/issLayout.js';
 import { LOUD_EVENTS, loadLogs, saveLogs, shareable } from '../lib/daylog.js';
 import {
-  ACTIVITIES, MAX_ACTIVITY_MIN, WORKDAY_MIN, PLUG_DB, T2, DEFAULT_FILL, DEFAULT_SLEEP, computePlan, setActivity, setPlaceMinutes, placeOptions, sleepOptions, normalize,
+  ACTIVITIES, MAX_ACTIVITY_MIN, WORKDAY_MIN, PLUG_DB, T2, DEFAULT_FILL, DEFAULT_SLEEP, computePlan, applyFlags, setActivity, setPlaceMinutes, placeOptions, sleepOptions, normalize,
 } from '../lib/plan.js';
 import { hearingState, TARGETS, planChecks } from '../lib/personal.js';
 import { BASES } from '../lib/bases.js';
@@ -113,9 +113,12 @@ function WeekView({ logs }) {
   );
 }
 
-export default function Planner({ plan: rawPlan, setPlan, data }) {
+export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
   const plan = normalize(rawPlan);
-  const r = computePlan(plan);
+  const target = TARGETS[hearingState(data).state];
+  const { plan: flaggedPlan, flagged } = applyFlags(plan, target.protectAbove);
+  const r = computePlan(flaggedPlan);
+  const skip = computePlan({ ...plan, protect: { t2: false, ared: false, loudPlaces: false } });
   const [logs, setLogs] = useState(loadLogs);
   const places = placeOptions(plan.base);
   const sleeps = sleepOptions(plan.base);
@@ -125,13 +128,13 @@ export default function Planner({ plan: rawPlan, setPlan, data }) {
 
   return (
     <section className="planner-page">
-      <div className="station-controls">
+      {!lockedBase && <div className="station-controls">
         <div className="segmented" role="tablist" aria-label="Base">
           {[['iss', 'ISS'], ['moon', 'Moon base'], ['mars', 'Mars base']].map(([k, label]) => (
             <button key={k} role="tab" aria-selected={plan.base === k} className={plan.base === k ? 'on' : ''} onClick={() => switchBase(k)}>{label}</button>
           ))}
         </div>
-      </div>
+      </div>}
       {plan.base !== 'iss' && (
         <p className="muted small">Simulated {BASES[plan.base].name.toLowerCase()}: area levels are the "ISS-like" values at {BASES[plan.base].defaultAtm} psia with fans sped up, as in Station noise. Exercise uses the ISS machines' levels.</p>
       )}
@@ -147,9 +150,6 @@ export default function Planner({ plan: rawPlan, setPlan, data }) {
                   <span>{a.id === 't2' ? 'T2 treadmill' : a.name} <em>{a.dba} dBA</em></span>
                   <input type="range" min="0" max={MAX_ACTIVITY_MIN} step="15" value={v} onChange={(e) => setPlan(setActivity(plan, a.id, Number(e.target.value)))} />
                   <span className="val">{v} min</span>
-                </label>
-                <label className="inline sub">
-                  <input type="checkbox" checked={!!plan.protect[a.id]} onChange={(e) => set({ protect: { ...plan.protect, [a.id]: e.target.checked } })} /> Earplugs
                 </label>
               </div>
             );
@@ -175,10 +175,18 @@ export default function Planner({ plan: rawPlan, setPlan, data }) {
               {places.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.dba} dBA)</option>)}
             </select>
           </label>
-          <label className="inline sub">
-            <input type="checkbox" checked={plan.protect.loudPlaces} onChange={(e) => set({ protect: { ...plan.protect, loudPlaces: e.target.checked } })} /> Earplugs in places louder than 60 dBA
-          </label>
           <DayBar result={r} />
+          <div className={`flags ${flagged.length ? 'on' : ''}`}>
+            <strong>{flagged.length ? 'Earshot flags: wear earplugs for' : 'No earplugs needed for this plan'}</strong>
+            {flagged.length > 0 && (
+              <ul>{flagged.map((f) => <li key={f.id}>{f.name} ({f.dba} dBA, above your {target.protectAbove} dBA threshold)</li>)}</ul>
+            )}
+            {flagged.length > 0 && (
+              <p className="small">
+                With them: {Math.round(r.dosePct)}% of the allowance, workday {r.work.leqDba.toFixed(1)} dBA. If you skip them: {Math.round(skip.dosePct)}%, {skip.work.leqDba.toFixed(1)} dBA.
+              </p>
+            )}
+          </div>
           <p className="muted small">16-hour workday, the period the flight rule averages over. Earplugs count as {PLUG_DB.toFixed(1)} dB of protection, from NASA's treadmill figure.</p>
 
           <h3>Earphones and personal audio</h3>
@@ -227,7 +235,7 @@ export default function Planner({ plan: rawPlan, setPlan, data }) {
         <h3>Your week</h3>
         <WeekView logs={logs} />
       </section>
-      <DayLog plan={plan} logs={logs} setLogs={setLogs} />
+      <DayLog plan={flaggedPlan} logs={logs} setLogs={setLogs} />
       <p className="muted">
         Sources: activity levels and earplug effect from NASA's noise-exposure worked example (Allen &amp; Danielson 2020); module levels from Allen 2024;
         limits from Flight Rule B13-152 and NASA-STD-3001 [V2 6115]; personal audio reference from the WHO-ITU safe-listening standard (H.870).

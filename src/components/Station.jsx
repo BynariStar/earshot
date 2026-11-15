@@ -12,6 +12,9 @@ import lmlstp from '../data/lmlstp.json';
 import Station3D from './Station3D.jsx';
 import { ISS_PARTS, SLEEP_IN, T2_MODULE, NOISE_BINS, NO_DATA_COLOR, noiseColor } from '../lib/issLayout.js';
 import { T2 } from '../lib/plan.js';
+import Spectrum from './Spectrum.jsx';
+import { faultDelta } from '../lib/spectrum.js';
+import { STATIONS } from '../lib/session.js';
 import { BASES, ATMOSPHERES, EXERCISE_SESSIONS, baseLevel, pressureDelta, SPEC_WORK_DBA, SPEC_SLEEP_DBA } from '../lib/bases.js';
 
 const byId = Object.fromEntries(iss.modules.map((m) => [m.id, m]));
@@ -79,12 +82,19 @@ function Segmented({ value, options, onChange, label }) {
   );
 }
 
-export default function Station() {
-  const [place, setPlace] = useState('iss');
-  const [mode, setMode] = useState('avg');
-  const [t, setT] = useState(8 * 60 + 30);
+export default function Station({ lockedPlace, demoEvents = [], focus = null, compact = false }) {
+  const [place, setPlace] = useState(lockedPlace ?? 'iss');
+  const [mode, setMode] = useState(lockedPlace ? 'now' : 'avg');
+  const [t, setT] = useState(() => {
+    if (!lockedPlace) return 8 * 60 + 30;
+    const d = new Date();
+    return Math.floor((d.getHours() * 60 + d.getMinutes()) / 5) * 5; // the home map opens at the current time of day
+  });
   const [playing, setPlaying] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(focus);
+  useEffect(() => {
+    if (focus) setSelected(focus);
+  }, [focus]);
   const [basis, setBasis] = useState('iss');
   const [atm, setAtm] = useState('8.2');
   const [fans, setFans] = useState('same-mass'); // realistic default: the same air mass must still move
@@ -101,12 +111,18 @@ export default function Station() {
     () => (base ? baseLevels(base, { basis, atm, fans, mode, t }) : place === 'iss' ? issLevels(mode, t) : chamberLevels(mode, t)),
     [base, place, basis, atm, fans, mode, t]
   );
+  // A demo fault raises one module's noise in the fault signature's bands.
+  const faultModule = demoEvents.some((e) => e.type === 'fan-fault') ? STATIONS[place]?.faultModule : null;
+  const levels2 = useMemo(() => {
+    if (!faultModule || !Number.isFinite(levels[faultModule])) return levels;
+    return { ...levels, [faultModule]: levels[faultModule] + faultDelta(faultModule) };
+  }, [levels, faultModule]);
   const sel = parts.find((p) => p.id === selected);
   const pick = (id) => setSelected(id);
 
   return (
     <section className="station">
-      <div className="station-controls">
+      {!lockedPlace && <div className="station-controls">
         <Segmented
           label="Place"
           value={place}
@@ -114,9 +130,14 @@ export default function Station() {
           options={[['iss', 'ISS'], ['moon', 'Moon base'], ['mars', 'Mars base'], ['chamber', 'NASA chamber (real data)']]}
         />
         <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={[['avg', 'Average'], ['now', 'At the moment']]} />
-      </div>
+      </div>}
+      {lockedPlace && (
+        <div className="station-controls">
+          <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={[['now', 'At the moment'], ['avg', 'Average']]} />
+        </div>
+      )}
 
-      {base && (
+      {base && !compact && (
         <div className="station-controls base-controls">
           <Segmented label="Levels" value={basis} onChange={setBasis} options={[['spec', 'Built to NASA limits'], ['iss', 'ISS-like']]} />
           <label className="select">
@@ -141,7 +162,7 @@ export default function Station() {
         </div>
       )}
 
-      <p className="muted provenance">
+      {!compact && <p className="muted provenance">
         {place === 'iss' && mode === 'avg' && "NASA's measured average for each module (Allen 2024, ICES-2024-354). Grey: no dBA value published (Unity and the Quest airlock are reported only as meeting NASA's NC-50 limit)."}
         {place === 'iss' && mode === 'now' && 'Simulated day. NASA publishes module averages, not live levels. Fans and pumps run around the clock, so modules change little hour to hour; the big swings come from crew activities. This day adds two treadmill hours and a sleep period to the measured averages.'}
         {base && (
@@ -155,26 +176,27 @@ export default function Station() {
         )}
         {place === 'chamber' && mode === 'avg' && "Real NASA data: each floor's 24-hour average from the 1997 90-day sealed-chamber test with four crew (LMLSTP 3.3, NASA Life Sciences Portal)."}
         {place === 'chamber' && mode === 'now' && "Real NASA data, minute by minute. Each floor's 24-hour recording was made on a different date; they're lined up here by time of day."}
-      </p>
+      </p>}
 
       <div className="station-stage">
         <Station3D
           key={place}
           parts={parts}
-          levels={levels}
+          levels={levels2}
           selected={selected}
           onSelect={pick}
           decor={base ? base.decor : place === 'iss' ? 'iss' : 'none'}
           camera={base ? base.camera : place === 'iss' ? [52, 40, 66] : [13, 11, 15]}
           target={base ? base.target : place === 'iss' ? [-5, -3, 0] : [0, 3, 0]}
-          highlight={base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined}
+          highlight={faultModule ?? (base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined)}
         />
         <aside className="station-panel">
           {events.map((e) => <p key={e.text} className="event">{e.text}</p>)}
+          {faultModule && <p className="event">{STATIONS[place].faultName}: {faultDelta(faultModule) > 0 ? '+' : ''}{faultDelta(faultModule).toFixed(1)} dB right now. Tap it for the likely source.</p>}
           {sel && base ? (
-            <BaseDetail part={sel} level={levels[sel.id]} why={whys[sel.id]} atm={atm} basis={basis} />
+            <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} atm={atm} basis={basis} fault={sel.id === faultModule} />
           ) : sel ? (
-            <ModuleDetail part={sel} level={levels[sel.id]} place={place} mode={mode} />
+            <ModuleDetail part={sel} level={levels2[sel.id]} place={place} mode={mode} fault={sel.id === faultModule} />
           ) : (
             <p className="muted">Drag to turn, pinch or scroll to zoom, and tap {place === 'chamber' ? 'a floor' : place === 'iss' ? 'a module' : 'an area'} for details.</p>
           )}
@@ -188,7 +210,7 @@ export default function Station() {
       </div>
 
       {place === 'chamber' && <ChamberChart floor={selected ? Number(selected.replace('floor', '')) : 1} t={mode === 'now' ? t : null} />}
-      {place === 'iss' && (
+      {place === 'iss' && !compact && (
         <details className="module-list">
           <summary>All measured levels, as a list</summary>
           <ul>
@@ -202,7 +224,7 @@ export default function Station() {
   );
 }
 
-function BaseDetail({ part, level, why, atm, basis }) {
+function BaseDetail({ part, level, why, atm, basis, fault }) {
   const d = pressureDelta(atm);
   return (
     <div className="module-detail">
@@ -216,6 +238,7 @@ function BaseDetail({ part, level, why, atm, basis }) {
         <p className="muted">No value.</p>
       )}
       <p className="small">{why}</p>
+      <Spectrum id={part.id} fault={fault} />
       {atm !== '14.7' && (
         <>
           <h4>Lower cabin pressure</h4>
@@ -231,7 +254,7 @@ function BaseDetail({ part, level, why, atm, basis }) {
   );
 }
 
-function ModuleDetail({ part, level, place, mode }) {
+function ModuleDetail({ part, level, place, mode, fault }) {
   const m = byId[part.id];
   const sleepers = SLEEP_IN[part.id] ?? [];
   return (
@@ -247,6 +270,7 @@ function ModuleDetail({ part, level, place, mode }) {
         <p className="muted">No dBA value published (reported only as meeting NASA's NC-50 limit, or not measured).</p>
       )}
       {m?.date && <p className="muted">NASA survey of {m.date}</p>}
+      {place === 'iss' && !part.struct && <Spectrum id={part.id} fault={fault} />}
       {sleepers.length > 0 && (
         <>
           <h4>Sleep stations here</h4>

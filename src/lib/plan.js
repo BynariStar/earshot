@@ -135,5 +135,16 @@ export function computePlan(plan) {
   const top = [...parts].sort((a, b) => b.dosePct - a.dosePct)[0];
   const remaining = Math.max(0, 100 - dosePct);
   const headroom = (dba) => (remaining / 100) * allowedMinutes(dba);
-  return { plan: p, day, work, sleep, sleepModule, parts, dosePct, top, fill, activityMinutes: used, headroom, remaining, background: f, rest: fill };
+  const placesUsed = day.filter((s) => s.kind === 'place').map((s) => s.placeId);
+  return { plan: p, day, work, sleep, sleepModule, parts, dosePct, top, fill, activityMinutes: used, headroom, remaining, background: f, rest: fill, placesUsed };
+}
+
+// Earshot decides protection: anything louder than the target's threshold gets earplugs.
+// Returns the plan with protection applied, and the list of flagged items.
+export function applyFlags(plan, protectAbove) {
+  const p = normalize(plan);
+  const protect = { loudPlaces: protectAbove <= 60 };
+  for (const a of ACTIVITIES) protect[a.id] = a.dba > protectAbove && (p.activities[a.id] ?? 0) > 0;
+  const flagged = computePlan({ ...p, protect }).day.filter((s) => s.protectedNow).map((s) => ({ id: s.id, name: s.name.replace(' (earplugs)', ''), dba: s.rawDba }));
+  return { plan: { ...p, protect }, flagged };
 }

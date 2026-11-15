@@ -128,13 +128,13 @@ export default function App() {
     ? buildAlerts({ station: session.station, data, events: session.events ?? [], plan: planResult, planFlags: flags.flagged, hearing, quick: data.quick ?? [] })
     : [];
 
-  // A new urgent or warning alert opens full screen once (not during a test, and not on the page it points to).
+  // A new popup alert opens full screen once (not during a test, and not on the page it points to).
   const alertKey = (a) => `${a.id}:${a.title}`;
   const seen = session?.seen ?? [];
   const busy = section === 'test' || section === 'quick' || section === 'welcome' || route === 'ears/sudden';
   const pageAlert = busy
     ? null
-    : alerts.find((a) => (a.level === 'urgent' || a.level === 'warn') && !seen.includes(alertKey(a)) && !a.actions.some((x) => x.to && x.to === route));
+    : alerts.find((a) => a.popup && !seen.includes(alertKey(a)) && !a.actions.some((x) => x.to && x.to === route));
   function dismissAlert(a) {
     setSession({ ...session, seen: [...seen, alertKey(a)] });
   }

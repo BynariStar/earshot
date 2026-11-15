@@ -24,14 +24,15 @@ export function quickPitchesFor(event) {
 
 const listJoin = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
-// Levels: 'urgent' and 'warn' open full screen once (act now); 'info' goes to the bell.
+// Every alert is listed behind the bell. Only `popup` alerts also open full screen (once): a confirmed sudden
+// drop, and noise where you are (wear earplugs, see the source). Requests for a hearing check never pop up.
 export function buildAlerts({ station, data, events, plan, planFlags, hearing, quick }) {
   const st = STATIONS[station];
   const out = [];
   const check = latestCheck(data);
   const sudden = check?.confirmedFindings?.find((f) => f.kind === 'sudden');
   if (sudden) {
-    out.push({ id: 'sudden', level: 'urgent', title: `Sudden drop in your ${sudden.ear} ear`, body: 'Tell your crew medical officer now. Treatment works best when it starts early.', actions: [{ label: 'Open the response', to: 'ears/sudden' }] });
+    out.push({ id: 'sudden', level: 'urgent', popup: true, title: `Sudden drop in your ${sudden.ear} ear`, body: 'Tell your crew medical officer now. Treatment works best when it starts early.', actions: [{ label: 'Open the response', to: 'ears/sudden' }] });
   }
 
   const lastQuick = quick?.[0];
@@ -50,9 +51,22 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
     out.push({
       id: 'fault',
       level: 'warn',
+      popup: true,
       title: `${st.faultName} is louder than normal`,
       body: `Likely a ${sig.name.toLowerCase()} (+${faultDelta(st.faultModule).toFixed(1)} dBA, louder at ${listJoin(sig.bands.map(bandLabel))}). Wear earplugs there until it's fixed.`,
       actions: [{ label: 'Show on the map', to: `home/${st.faultModule}` }, { label: 'Plan around it', to: 'plan' }],
+    });
+  }
+
+  // Proactive popup: only "wear earplugs" and where the noise comes from. The hearing check goes to the bell.
+  if (live) {
+    out.push({
+      id: 'live-earplugs',
+      level: 'warn',
+      popup: true,
+      title: `${live.where} got loud: wear earplugs there`,
+      body: `${live.cause}. You were in ${live.where} when it started. Wear earplugs there until it's fixed.`,
+      actions: live.part ? [{ label: 'Show the source', to: `home/${live.part}` }] : [],
     });
   }
 
@@ -65,9 +79,9 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
       out.push({
         id: 'exposure',
         level: 'warn',
-        title: loud ? 'Treadmill without earplugs' : exposure === live ? `${live.where} got loud while you were there` : `You were in ${st.faultName} during the fault`,
-        body: `${exposure === live ? `${live.cause}. ` : ''}Check your hearing tonight: 2 minutes at ${listJoin(pitches.map(bandLabel))}, the pitches this noise reaches. A change right after noise may be temporary; Earshot rechecks tomorrow.`,
-        actions: [{ label: 'Quick check', to: `quick/${exposure.type}` }, ...(exposure === live && live.part ? [{ label: 'Show on the map', to: `home/${live.part}` }] : [])],
+        title: 'Check your hearing tonight',
+        body: `${loud ? 'You ran on the treadmill without earplugs.' : exposure === live ? `You were in ${live.where} while it was loud.` : `You were in ${st.faultName} during the fault.`} 2 minutes at ${listJoin(pitches.map(bandLabel))}, the pitches this noise reaches.`,
+        actions: [{ label: 'Quick check', to: `quick/${exposure.type}` }],
       });
     }
   }

@@ -333,11 +333,15 @@ describe('live feed (simulated)', () => {
     expect([...hits].sort()).toEqual(['iss:node2', 'mars:r_work', 'moon:m_work']);
     const data = { tests: [], quick: [] };
     const a = buildAlerts({ station: 'iss', data, events: [{ type: 'live', where: 'Node 2 (Harmony)', part: 'node2', cause: 'Likely a stalled ventilation fan, +4.8 dBA', pitches: incidentPitches(hit), at: 1 }], plan: null, planFlags: [], hearing: null, quick: [] });
+    // The popup says wear earplugs and shows the source; the hearing check waits behind the bell.
+    const pop = a.filter((x) => x.popup);
+    expect(pop.map((x) => x.id)).toEqual(['live-earplugs']);
+    expect(pop[0].title).toBe('Node 2 (Harmony) got loud: wear earplugs there');
+    expect(pop[0].actions.map((x) => x.to)).toEqual(['home/node2']);
     const ex = a.find((x) => x.id === 'exposure');
-    expect(ex.level).toBe('warn');
-    expect(ex.title).toBe('Node 2 (Harmony) got loud while you were there');
+    expect(ex.popup).toBeFalsy();
     expect(ex.body).toContain('500 Hz, 1 kHz and 4 kHz');
-    expect(ex.actions.map((x) => x.to)).toEqual(['quick/live', 'home/node2']);
+    expect(ex.actions.map((x) => x.to)).toEqual(['quick/live']);
   });
 });
 

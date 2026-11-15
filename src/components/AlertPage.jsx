@@ -1,6 +1,6 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
-// A new urgent or warning alert takes over the screen once, so it can't be missed. After the crew member
+// A popup alert (sudden drop, or noise where you are) takes over the screen once, so it can't be missed. After the crew member
 // acts on it or dismisses it, it stays in the alert list on the home screen.
 import { useEffect, useRef } from 'react';
 
@@ -31,7 +31,7 @@ export default function AlertPage({ alert, onAct, onDismiss }) {
           ))}
         </div>
         <button className="link-button" ref={alert.actions.length ? null : first} onClick={onDismiss}>
-          Not now: keep it in my alerts
+          Got it
         </button>
       </div>
     </div>

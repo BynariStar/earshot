@@ -538,3 +538,6 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 .custom-form input, .custom-form select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font: inherit; }
 .custom-form input { width: 70px; }
 .custom-form p { flex-basis: 100%; margin: 0; }
+.popover-body .note.urgent strong { color: var(--urgent); display: flex; align-items: center; gap: 6px; }
+.popover-body .note.warn strong { color: var(--watch); }
+.bell .count.urgent { background: var(--urgent); color: #fff; }

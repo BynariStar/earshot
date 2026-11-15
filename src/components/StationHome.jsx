@@ -43,7 +43,7 @@ function Popover({ label, button, children, className = '' }) {
 
 export default function StationHome({ session, persona, alerts, go, focus, onEvent, onClearEvents, onChange, liveStart }) {
   const st = STATIONS[session.station];
-  const bell = alerts.filter((a) => a.level === 'info' || a.level === 'ok');
+  const bell = alerts; // everything, most urgent first; popups also appear here after they've been seen
   const act = (x) => (x.event ? onEvent(x.event) : go(x.to));
   const myEars = alerts.find((a) => a.id === 'baseline') ? 'Set your baseline' : 'Your hearing, check by check';
   const flags = alerts.find((a) => a.id === 'flags');
@@ -58,13 +58,13 @@ export default function StationHome({ session, persona, alerts, go, focus, onEve
           </span>
         </div>
         <div className="head-tools">
-          <Popover label={`Notifications: ${bell.length}`} className="bell" button={<><BellIcon />{bell.length > 0 && <span className="count">{bell.length}</span>}</>}>
+          <Popover label={`Notifications: ${bell.length}`} className="bell" button={<><BellIcon />{bell.length > 0 && <span className={`count${bell.some((x) => x.level === 'urgent') ? ' urgent' : ''}`}>{bell.length}</span>}</>}>
             {(close) => (
               <>
                 {bell.length === 0 && <p className="muted small">Nothing new.</p>}
                 {bell.map((a) => (
-                  <div key={a.id} className="note">
-                    <strong>{a.title}</strong>
+                  <div key={a.id} className={`note ${a.level}`}>
+                    <strong>{a.level === 'urgent' && <span className="event-dot" aria-hidden="true" />}{a.title}</strong>
                     <span className="muted small">{a.body}</span>
                     {a.actions.map((x) => (
                       <button key={x.label} className="link-button inline-link" onClick={() => { close(); act(x); }}>{x.label}</button>

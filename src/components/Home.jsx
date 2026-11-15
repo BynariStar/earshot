@@ -11,6 +11,8 @@ import { baselineTests, latestCheck, isNoisy } from '../lib/storage.js';
 import Trend from './Trend.jsx';
 import { contextInputs, cognitionComparison } from '../lib/context.js';
 import Info from './Info.jsx';
+import Sheet from './Sheet.jsx';
+import { SYMPTOMS } from '../lib/alerts.js';
 
 const STATUS_TEXT = {
   untested: 'Not tested yet',
@@ -24,7 +26,8 @@ const RANK = { urgent: 4, shift: 3, watch: 2 };
 const hz = (f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
-export default function Home({ data, onStartTest, onOpenSudden, simulated, earplugs = [], go }) {
+export default function Home({ data, onStartTest, onOpenSudden, simulated, earplugs = [], go, onReport }) {
+  const [reporting, setReporting] = useState(null); // null | 'symptom' | { symptom }
   const [picked, setPicked] = useState(null);
   const baselines = baselineTests(data);
   const check = latestCheck(data);
@@ -130,6 +133,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
         <div className="action-bar">
           <div className="action-bar-inner">
             {reference && <button className="primary" onClick={() => go('quick/general')}>Quick check · 2 min</button>}
+            {reference && <button className="secondary" onClick={() => setReporting('symptom')}>Report a symptom</button>}
             {cta && <button className={reference ? 'secondary' : 'primary'} onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
           </div>
         </div>
@@ -161,6 +165,26 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
           baseline, using NASA's hearing-shift rules: green steady, yellow 5 to 9 dB worse, orange 10 dB or more, red 30 dB or more, grey no response at baseline.
         </Info>
       </p>
+      {reporting === 'symptom' && (
+        <Sheet title="Report a symptom" onClose={() => setReporting(null)}>
+          <div className="rows">
+            {Object.entries(SYMPTOMS).map(([k, label]) => (
+              <button key={k} className="row" onClick={() => setReporting({ symptom: k })}><span>{label}</span><span aria-hidden="true">›</span></button>
+            ))}
+          </div>
+        </Sheet>
+      )}
+      {reporting?.symptom && (
+        <Sheet title={`${SYMPTOMS[reporting.symptom]}: which ear?`} onClose={() => setReporting(null)}>
+          <div className="rows">
+            {[['left', 'Left ear'], ['right', 'Right ear'], ['both', 'Both ears']].map(([ear, label]) => (
+              <button key={ear} className="row" onClick={() => { setReporting(null); onReport({ type: 'ringing', symptom: reporting.symptom, ear }); }}>
+                <span>{label}</span><span aria-hidden="true">›</span>
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
       <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
     </section>
   );

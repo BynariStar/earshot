@@ -11,7 +11,7 @@ const Station = lazy(() => import('./Station.jsx'));
 
 const DEMO_EVENTS = [
   { type: 'loud', label: 'Treadmill without earplugs' },
-  { type: 'ringing', label: 'Ringing in the right ear', ear: 'right' },
+  { type: 'ringing', symptom: 'ringing', label: 'Report ringing in the right ear', ear: 'right' },
 ];
 
 export default function StationHome({ session, persona, focus, onEvent, onClearEvents, onChange, liveStart, pausedAt, onTogglePause, onMoveMe }) {

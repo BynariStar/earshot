@@ -6,7 +6,7 @@ import { useState } from 'react';
 import TestRunner from './TestRunner.jsx';
 import { averageBaselines, isNoResponse } from '../lib/rules.js';
 import { baselineTests } from '../lib/storage.js';
-import { quickPitchesFor } from '../lib/alerts.js';
+import { quickPitchesFor, SYMPTOMS } from '../lib/alerts.js';
 import Info from './Info.jsx';
 import { simulatedThresholds } from '../lib/personas.js';
 import { simulate } from '../lib/threshold.js';
@@ -115,9 +115,16 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
     );
   }
 
+  const reported = kind === 'ringing' ? events.find((e) => e.type === 'ringing') : null;
   return (
     <section className="panel">
-      <h2>Quick check: {pitches.map(bandLabel).join(', ')}</h2>
+      {reported && (
+        <p className="reported">
+          <span className="event-dot" aria-hidden="true" /> {SYMPTOMS[reported.symptom ?? 'ringing']} reported in your {reported.ear === 'both' ? 'ears' : `${reported.ear ?? 'right'} ear`},{' '}
+          {new Date(reported.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+        </p>
+      )}
+      <h2>{reported ? 'Check now' : 'Quick check'}: {pitches.map(bandLabel).join(', ')}</h2>
       <p>
         2 minutes, both ears.
         <Info>Why these pitches: {WHY[kind] ?? WHY.general}. Use the same headphones and volume as your baseline, in the quietest spot you can find.</Info>
@@ -129,6 +136,7 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
           ) : (
             <button className="primary" onClick={() => setStage('running')}>Start (headphones on)</button>
           )}
+          <button className="secondary" onClick={() => go('')}>Not now</button>
         </div>
       </div>
     </section>

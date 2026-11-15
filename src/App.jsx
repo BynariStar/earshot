@@ -200,6 +200,11 @@ export default function App() {
   function addEvent(e) {
     changeSession((prev) => ({ ...prev, events: [...(prev.events ?? []).filter((x) => x.type !== e.type), { ...e, at: Date.now() }] }));
   }
+  // A reported symptom is the user's own action, so it opens the check straight away (the alert stays until it's done).
+  function reportSymptom(e) {
+    addEvent(e);
+    go('quick/ringing');
+  }
   function clearEvents() {
     setSession({ ...session, events: [], seen: [], bellSeen: [], done: [], liveStart: Date.now(), pausedAt: null, youAt: null });
     if (persona) {
@@ -260,7 +265,7 @@ export default function App() {
           persona={persona}
           go={go}
           focus={section === 'home' ? sub : null}
-          onEvent={addEvent}
+          onEvent={(e) => (e.type === 'ringing' ? reportSymptom(e) : addEvent(e))}
           onClearEvents={clearEvents}
           onChange={() => go('welcome')}
           data={data}
@@ -302,7 +307,7 @@ export default function App() {
 
       <main>
         {earsTab === 'overview' && (
-          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} earplugs={flags.flagged.map((f) => f.name)} go={go} />
+          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} earplugs={flags.flagged.map((f) => f.name)} go={go} onReport={reportSymptom} />
         )}
         {earsTab === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={startTest} />}
         {earsTab === 'sudden' && <SuddenResponse data={data} onRetest={() => go('quick/ringing')} />}

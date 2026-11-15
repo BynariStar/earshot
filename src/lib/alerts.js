@@ -22,6 +22,7 @@ export function quickPitchesFor(event) {
   return [2000, 3000, 4000]; // loud exposure, e.g. treadmill without earplugs
 }
 
+export const SYMPTOMS = { ringing: 'Ringing', muffled: 'Muffled hearing', fullness: 'Ear fullness or pain' };
 export const alertKey = (a) => `${a.id}:${a.title}`;
 const listJoin = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
@@ -44,7 +45,7 @@ export function buildAlerts({ station, data, events, plan, quick }) {
 
   if (ringing) {
     const done = lastQuick && lastQuick.at > ringing.at;
-    if (!done) out.push({ id: 'ringing', level: 'urgent', title: `Ringing in your ${ringing.ear ?? 'right'} ear`, body: 'Check your hearing now: 2 minutes, 1 to 4 kHz, both ears.', actions: [{ label: 'Quick check now', to: 'quick/ringing' }] });
+    if (!done) out.push({ id: 'ringing', level: 'urgent', title: `${SYMPTOMS[ringing.symptom ?? 'ringing']} in your ${ringing.ear === 'both' ? 'ears' : `${ringing.ear ?? 'right'} ear`}`, body: 'Check your hearing now: 2 minutes, 1 to 4 kHz, both ears.', actions: [{ label: 'Quick check now', to: 'quick/ringing' }] });
   }
 
   if (fault) {

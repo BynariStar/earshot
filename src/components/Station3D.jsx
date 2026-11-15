@@ -54,10 +54,26 @@ function addIssDecor(scene) {
   }
 }
 
-function addGround(scene, color) {
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.MeshStandardMaterial({ color, roughness: 1 }));
+// A round patch of terrain whose edge fades into the background, like a tabletop model, so no hard edge
+// or horizon is ever visible.
+function addGround(scene, color, radius = 13) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.55, '#ffffff');
+  grad.addColorStop(1, '#000000');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  const alpha = new THREE.CanvasTexture(c);
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(radius, 64),
+    new THREE.MeshStandardMaterial({ color, roughness: 1, transparent: true, alphaMap: alpha, depthWrite: false })
+  );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.01;
+  ground.renderOrder = -1;
   scene.add(ground);
 }
 
@@ -118,6 +134,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     const scene = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(40, width / height, 0.5, 1000);
     cam.position.set(...camera);
+    // Narrow screens: step the camera back so the whole station still fits.
+    if (width / height < 1) cam.position.sub(new THREE.Vector3(...target)).multiplyScalar(Math.min(1.9, 0.9 / (width / height))).add(new THREE.Vector3(...target));
     scene.add(new THREE.AmbientLight('#ffffff', 0.9));
     const sun = new THREE.DirectionalLight('#ffffff', 1.6);
     sun.position.set(40, 80, 30);
@@ -137,8 +155,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     scene.add(marker);
     markerRef.current = marker;
     if (decor === 'iss') addIssDecor(scene);
-    if (decor === 'moon') addGround(scene, '#3d4049');
-    if (decor === 'mars') addGround(scene, '#6b3420');
+    if (decor === 'moon') addGround(scene, '#3b3e48', 11);
+    if (decor === 'mars') addGround(scene, '#6a3220', 15);
 
     const controls = new OrbitControls(cam, renderer.domElement);
     controls.target.set(...target);

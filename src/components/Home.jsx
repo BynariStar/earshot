@@ -8,9 +8,9 @@ import { averageBaselines, shifts, regionStatusFor, FREQUENCIES } from '../lib/r
 import { REGION_INFO } from '../lib/cochlea.js';
 import { explain } from '../lib/advice.js';
 import { baselineTests, latestCheck, isNoisy } from '../lib/storage.js';
-import { hearingState } from '../lib/personal.js';
 import Trend from './Trend.jsx';
-import { compareAll, contextInputs, bandOf } from '../lib/context.js';
+import { contextInputs, cognitionComparison } from '../lib/context.js';
+import Info from './Info.jsx';
 
 const STATUS_TEXT = {
   untested: 'Not tested yet',
@@ -24,7 +24,7 @@ const RANK = { urgent: 4, shift: 3, watch: 2 };
 const hz = (f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
-export default function Home({ data, onStartTest, onOpenSudden, simulated }) {
+export default function Home({ data, onStartTest, onOpenSudden, simulated, earplugs = [], go }) {
   const [picked, setPicked] = useState(null);
   const baselines = baselineTests(data);
   const check = latestCheck(data);
@@ -49,95 +49,116 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated }) {
     return best;
   }, [statusByEar]);
   const checkId = check?.id ?? null;
-  const selected = picked && picked.checkId === checkId ? picked : worst ?? { ear: 'left', frequency: 4000 };
+  const shown = picked && picked.checkId === checkId ? picked : null; // the region popover, open on tap only
+  const selected = shown ?? worst ?? { ear: 'left', frequency: 4000 };
   const setSelected = (sel) => setPicked({ ...sel, checkId });
 
   const findings = check?.confirmedFindings ?? [];
   const inputs = contextInputs(data);
-  const info = REGION_INFO[selected.frequency];
-  const status = statusByEar[selected.ear]?.[selected.frequency] ?? 'untested';
-  const delta = statusByEar.raw?.[selected.ear]?.perFreq?.[selected.frequency];
+  const firstSentence = (t) => t.split(/(?<=\.)\s/)[0];
 
-  // The verdict.
-  let title, sub, actions = [], why = null, cta = null;
+  // The verdict: one sentence, one action.
+  let title, sub, more = null, todo = [], cta = null;
   if (baselines.length < 2) {
     title = baselines.length ? 'Finish your baseline' : 'Set your baseline';
-    sub = baselines.length ? 'One more 8-minute test. Every later check compares against these two.' : 'Two 8-minute tests on your own headphones. Every later check compares against them.';
+    sub = baselines.length ? 'One more 8-minute test.' : 'Two 8-minute tests on your own headphones.';
+    more = 'Every later check compares against these two tests, on the same headphones and volume.';
     cta = { label: baselines.length ? 'Baseline test 2 of 2' : 'Baseline test 1 of 2', role: 'baseline' };
   } else if (!check) {
     title = 'Baseline set';
-    sub = 'Earshot asks for a check after loud exposures, or you can run one now.';
-    cta = { label: 'Check my hearing', role: 'check' };
+    sub = 'Earshot asks for a check after loud exposures.';
+    cta = { label: 'Full check', role: 'check' };
   } else if (findings.length) {
     const f = findings.find((x) => x.kind === 'sudden') ?? findings[0];
     const e = explain(f);
     title = e.title;
-    sub = e.what;
-    actions = e.actions;
-    if (f.kind !== 'sudden') why = compareAll(f.averageDb, f.kind, inputs);
+    sub = firstSentence(e.what);
+    more = e.what.slice(sub.length).trim() || null;
+    todo = e.actions.slice(0, 3);
   } else if (worst) {
     const w = statusByEar.raw[worst.ear].perFreq[worst.frequency];
-    title = `${cap(worst.ear)} ear, ${hz(worst.frequency)}: ${Math.round(w)} dB worse than your baseline`;
-    sub = `Within test error, so it may be chance.${hearingState(data).state === 'high' ? ' Stricter noise targets are on until it settles.' : ''}`;
-    why = compareAll(w, bandOf(worst.frequency), inputs).filter((r) => r.id !== 'cognition');
+    title = `${cap(worst.ear)} ear, ${hz(worst.frequency)}: ${Math.round(w)} dB worse`;
+    sub = 'Within test error, so it may be chance.';
+    more = "Portable hearing tests vary by about 5 dB from test to test; NASA counts 10 dB as a shift (Wexler et al. 2026). Earshot keeps watching this pitch and asks for a check after loud days.";
   } else {
     title = 'Both ears steady';
     sub = 'Every pitch within 5 dB of your baseline.';
   }
-  if (!cta && !simulated && check) cta = { label: 'Check my hearing', role: 'check' };
-  // An ear with no response at any pitch at baseline can't be tracked; say so once.
   const deafEar = reference && ['left', 'right'].find((e) => FREQUENCIES.every((f) => statusByEar[e]?.[f] === 'unmeasurable'));
   if (deafEar) sub = `${sub} Your ${deafEar} ear gave no response at baseline, so Earshot tracks your ${deafEar === 'left' ? 'right' : 'left'} ear.`;
+  if (!cta && !simulated && check) cta = { label: 'Full check', role: 'check' };
+  // Canadian Space Agency PRET data: one sentence, only when it changes the conclusion.
+  const cog = data.cognition?.length ? cognitionComparison(inputs.cognition, inputs.hearingShift) : null;
+  const cogLine =
+    cog?.level === 'flag'
+      ? 'Your auditory memory score dropped too. That is likely your hearing, not your thinking.'
+      : cog?.level === 'watch' && data.cognition?.length
+        ? 'Your auditory memory score dropped, but your hearing is steady, so hearing does not explain it.'
+        : null;
+
+  const info = REGION_INFO[selected.frequency];
+  const status = statusByEar[selected.ear]?.[selected.frequency] ?? 'untested';
+  const delta = statusByEar.raw?.[selected.ear]?.perFreq?.[selected.frequency];
 
   return (
-    <section className="home">
+    <section className="home ears-page">
       <div className="ears-verdict">
         <h2>{title}</h2>
-        <p>{sub}</p>
+        <p>
+          {sub}
+          {more && <Info>{more}</Info>}
+        </p>
         {check && isNoisy(check) && <p className="noisy-note">This check was measured in noise. Retest somewhere quiet.</p>}
-        {actions.length > 0 && <ul className="verdict-actions">{actions.map((a) => <li key={a}>{a}</li>)}</ul>}
-        {findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
-        {why && (
-          <details className="why">
-            <summary>Why</summary>
-            <ul>
-              {why.filter((r) => r.level !== 'none').map((r) => (
-                <li key={r.id}>
-                  <strong>{r.question}</strong> {r.verdict} <span className="muted small">{r.source}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
+        {todo.length > 0 && (
+          <div className="todo">
+            <span className="label-caps">What to do</span>
+            <ul>{todo.map((a) => <li key={a}>{a}</li>)}</ul>
+          </div>
         )}
-        {cta && <button className="secondary" onClick={() => onStartTest(cta.role)}>{cta.label}</button>}
-        {check && <p className="muted small">Last check: {Number.isFinite(check.missionDay) ? `mission day ${check.missionDay}` : new Date(check.date).toLocaleString()}</p>}
+        {findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
+        {earplugs.length > 0 && (findings.length ? findings.some((f) => f.kind === 'high') : !!worst && worst.frequency >= 2000) && (
+          <p>
+            Earshot has added earplugs to your plan: {earplugs.join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See my plan</button>
+          </p>
+        )}
+        {cogLine && (
+          <p>
+            {cogLine}
+            <Info>{`Canadian Space Agency PRET open data: ${cog.detail}`}</Info>
+          </p>
+        )}
+        <div className="row-buttons left">
+          {reference && <button className="primary" onClick={() => go('quick/general')}>Quick check · 2 min</button>}
+          {cta && <button className="secondary" onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
+        </div>
       </div>
 
-      <div className="ears">
+      <div className="ears two">
         {['left', 'right'].map((ear) => (
           <figure key={ear} className="ear">
             <Cochlea ear={ear} statuses={statusByEar[ear]} selected={selected} onSelect={setSelected} />
             <figcaption>{ear === 'right' ? 'Right ear' : 'Left ear'}</figcaption>
+            {shown && shown.ear === ear && (
+              <div className="ear-pop" role="dialog" aria-label={`${cap(ear)} ear, ${info.label}`}>
+                <button className="sheet-close" onClick={() => setPicked(null)} aria-label="Close">×</button>
+                <strong>{info.label}</strong>
+                <p className={`status-text ${status}`}>
+                  {STATUS_TEXT[status]}
+                  {Number.isFinite(delta) && status !== 'unmeasurable' && status !== 'untested' ? ` (${delta > 0 ? '+' : ''}${delta.toFixed(0)} dB)` : ''}
+                </p>
+                <p className="muted small">{info.hears}</p>
+              </div>
+            )}
           </figure>
         ))}
-        <aside className="region-panel" aria-live="polite">
-          <h3>
-            {selected.ear === 'right' ? 'Right' : 'Left'} ear · {info.label}
-          </h3>
-          <p className={`status-pill ${status}`}>{STATUS_TEXT[status]}</p>
-          {Number.isFinite(delta) && status !== 'unmeasurable' && status !== 'untested' && <p className="muted small">{delta > 0 ? '+' : ''}{delta.toFixed(0)} dB from your baseline (higher = harder to hear)</p>}
-          <h4>What this part hears</h4>
-          <p>{info.hears}</p>
-          <h4>What NASA knows</h4>
-          <p>{info.nasa}</p>
-        </aside>
       </div>
-      <p className="muted small ears-caption">Each band sits where that pitch is heard along the cochlea. Colours compare your latest check with your baseline, using NASA's hearing-shift rules.</p>
-      <div className="legend">
-        {['ok', 'watch', 'shift', 'urgent', 'unmeasurable', 'untested'].map((s) => (
-          <span key={s} className={`legend-item ${s}`}>{STATUS_TEXT[s].split(':')[0]}</span>
-        ))}
-      </div>
+      <p className="muted small ears-caption">
+        Tap a band for details.
+        <Info>
+          Each band sits where that pitch is heard along the cochlea: high pitches near the entrance, low pitches at the centre. Colours compare your latest check with your
+          baseline, using NASA's hearing-shift rules: green steady, yellow 5 to 9 dB worse, orange 10 dB or more, red 30 dB or more, grey no response at baseline.
+        </Info>
+      </p>
       <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
     </section>
   );

@@ -7,6 +7,7 @@ import TestRunner from './TestRunner.jsx';
 import { averageBaselines, isNoResponse } from '../lib/rules.js';
 import { baselineTests } from '../lib/storage.js';
 import { quickPitchesFor } from '../lib/alerts.js';
+import Info from './Info.jsx';
 import { simulatedThresholds } from '../lib/personas.js';
 import { simulate } from '../lib/threshold.js';
 import { bandLabel } from '../lib/spectrum.js';
@@ -61,7 +62,8 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
     const w = result.worst;
     return (
       <section className="panel quick-result">
-        <h2>{w >= 30 ? `Possible sudden drop: ${w} dB at ${bandLabel(result.worstAt)}, ${result.worstEar} ear` : w >= 10 ? `${w} dB worse at ${bandLabel(result.worstAt)}, ${result.worstEar} ear` : 'No change at these pitches'}</h2>
+        <h2>{w >= 10 ? `${result.worstEar === 'left' ? 'Left' : 'Right'} ear, ${bandLabel(result.worstAt)}: ${w} dB worse` : w >= 5 ? 'No change beyond test error' : 'No change'}</h2>
+        {w >= 30 && <p className="urgent-text">Possible sudden drop.</p>}
         <table className="audiogram-table">
           <thead><tr><th>Ear</th>{pitches.map((f) => <th key={f}>{bandLabel(f)}</th>)}</tr></thead>
           <tbody>
@@ -70,21 +72,45 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
             ))}
           </tbody>
         </table>
-        <p className="muted small">Change from your baseline in dB (higher = harder to hear).{result.simulated ? ' Simulated responses of a simulated crew member.' : ''}</p>
+        <p className="muted small">
+          Change from your baseline, in dB
+          <Info>Higher means harder to hear. Measured on your own headphones against your own baseline.{result.simulated ? ' These are the simulated responses of a simulated crew member.' : ''}</Info>
+        </p>
         {w >= 30 ? (
           <>
-            <p><strong>Tell your crew medical officer now.</strong> Confirm it with the full check, which starts the sudden-drop response if the drop is real.</p>
+            <div className="todo">
+              <span className="label-caps">What to do</span>
+              <ul>
+                <li>Tell your crew medical officer now.</li>
+                <li>Run the full check to confirm it.</li>
+              </ul>
+            </div>
+            <p className="muted small">
+              Why
+              <Info>A drop of 30 dB or more may be sudden hearing loss. Treatment works best when it starts early. If the full check confirms it, Earshot opens the sudden-drop response.</Info>
+            </p>
             {result.simulated ? <button className="primary" onClick={onSimulatedFullCheck}>Run the full check (simulated)</button> : <button className="primary" onClick={() => go('test/check')}>Full check now</button>}
           </>
         ) : w >= 10 ? (
           <>
-            <p>A change this size right after loud noise is often temporary. Protect your ears for the rest of today, keep tonight quiet, and Earshot will ask for a recheck tomorrow. If it's still there, the full check follows.</p>
+            <div className="todo">
+              <span className="label-caps">What to do</span>
+              <ul>
+                <li>Earplugs for loud tasks today.</li>
+                <li>A quiet night.</li>
+                <li>Recheck tomorrow. Earshot will ask.</li>
+              </ul>
+            </div>
+            <p className="muted small">
+              Why
+              <Info>A change right after loud noise is often temporary. If it's still there tomorrow, Earshot runs the full check.</Info>
+            </p>
             <button className="secondary" onClick={() => go('test/check')}>Full check now instead</button>
           </>
         ) : (
-          <p>Within {Math.max(w, 0)} dB of your baseline. Nothing to do; Earshot keeps watching.</p>
+          <p>Nothing to do. Earshot keeps watching.</p>
         )}
-        <button className="link-button" onClick={() => go('')}>Back to the station</button>
+        <button className="link-button" onClick={() => go('ears')}>Back to my ears</button>
       </section>
     );
   }
@@ -92,8 +118,10 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
   return (
     <section className="panel">
       <h2>Quick check: {pitches.map(bandLabel).join(', ')}</h2>
-      <p>About 2 minutes, both ears. Why these pitches: {WHY[kind] ?? WHY.general}.</p>
-      <p className="muted small">Same headphones and volume as your baseline, in the quietest spot you can find.</p>
+      <p>
+        2 minutes, both ears.
+        <Info>Why these pitches: {WHY[kind] ?? WHY.general}. Use the same headphones and volume as your baseline, in the quietest spot you can find.</Info>
+      </p>
       <div className="row-buttons left">
         {persona ? (
           <button className="primary" onClick={runSimulated}>Simulate {persona.name}'s responses</button>

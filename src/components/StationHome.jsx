@@ -4,6 +4,7 @@
 // waits behind the bell. Below the map: what's happening now, then Plan my day, My ears, Quick check.
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { STATIONS } from '../lib/session.js';
+import { partsOf } from '../lib/live.js';
 
 const Station = lazy(() => import('./Station.jsx'));
 
@@ -41,11 +42,11 @@ function Popover({ label, button, children, className = '' }) {
   );
 }
 
-export default function StationHome({ session, persona, alerts, go, focus, onEvent, onClearEvents, onChange, liveStart }) {
+export default function StationHome({ session, persona, alerts, go, focus, onEvent, onClearEvents, onChange, liveStart, onMoveMe }) {
   const st = STATIONS[session.station];
   const bell = alerts; // everything, most urgent first; popups also appear here after they've been seen
   const act = (x) => (x.event ? onEvent(x.event) : go(x.to));
-  const myEars = alerts.find((a) => a.id === 'baseline') ? 'Set your baseline' : 'Your hearing, check by check';
+  const myEars = alerts.find((a) => a.id === 'baseline') ? 'Set your baseline' : 'Your hearing and quick checks';
   const flags = alerts.find((a) => a.id === 'flags');
   return (
     <div className="station-home">
@@ -58,7 +59,7 @@ export default function StationHome({ session, persona, alerts, go, focus, onEve
           </span>
         </div>
         <div className="head-tools">
-          <Popover label={`Notifications: ${bell.length}`} className="bell" button={<><BellIcon />{bell.length > 0 && <span className={`count${bell.some((x) => x.level === 'urgent') ? ' urgent' : ''}`}>{bell.length}</span>}</>}>
+          <Popover label={`Notifications: ${bell.length}`} className="bell" button={<><BellIcon />{bell.length > 0 && <span className={`count ${bell.some((x) => x.level === 'urgent') ? 'urgent' : bell.some((x) => x.level === 'warn') ? 'warn' : 'info'}`}>{bell.length}</span>}</>}>
             {(close) => (
               <>
                 {bell.length === 0 && <p className="muted small">Nothing new.</p>}
@@ -74,10 +75,17 @@ export default function StationHome({ session, persona, alerts, go, focus, onEve
               </>
             )}
           </Popover>
-          <Popover label="Demo" className="demo" button={<span className="demo-label">Demo</span>}>
+          <Popover label="Demo controls" className="demo" button={<span className="demo-label"><span className="wide-only">Demo controls</span><span className="narrow-only">Demo</span></span>}>
             {(close) => (
               <>
-                <p className="muted small">The live feed runs by itself. Add an event:</p>
+                <label className="menu-field">
+                  Move me to
+                  <select value={session.youAt ?? ''} onChange={(e) => { onMoveMe(e.target.value || null); close(); }}>
+                    <option value="">Follow my schedule</option>
+                    {partsOf(session.station).filter((p) => !p.struct).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  </select>
+                </label>
+                <p className="muted small">Add an event:</p>
                 {DEMO_EVENTS.map((e) => (
                   <button key={e.type} className="menu-item" onClick={() => { close(); onEvent(e); }}>{e.label}</button>
                 ))}
@@ -97,21 +105,19 @@ export default function StationHome({ session, persona, alerts, go, focus, onEve
       </header>
 
       <Suspense fallback={<p className="muted">Loading the station…</p>}>
-        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact liveStart={liveStart} youStation={session.station} />
+        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact liveStart={liveStart} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={onMoveMe} />
       </Suspense>
 
       <nav className="home-nav" aria-label="Main">
         <button onClick={() => go('plan')}>
+          <Icon name="plan" />
           <strong>Plan my day</strong>
           <span className="muted small">{flags ? flags.title : 'No earplugs needed today'}</span>
         </button>
         <button onClick={() => go('ears')}>
+          <Icon name="ear" />
           <strong>My ears</strong>
           <span className="muted small">{myEars}</span>
-        </button>
-        <button onClick={() => go('quick/general')}>
-          <strong>Quick check</strong>
-          <span className="muted small">2 minutes</span>
         </button>
       </nav>
     </div>
@@ -123,6 +129,19 @@ function BellIcon() {
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
       <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
+}
+
+const ICONS = {
+  plan: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 18h2" /></>,
+  ear: <><path d="M6 8.5a6 6 0 0 1 12 0c0 3.5-2.5 4.6-3.5 6.3-.9 1.6-.6 3.2-1.8 4.4A3 3 0 0 1 7.5 18" /><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.6-1.6 2.2-2 3.3" /></>,
+  check: <><path d="M2 12h4l3-7 4 14 3-7h6" /></>,
+};
+function Icon({ name }) {
+  return (
+    <svg className="nav-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {ICONS[name]}
     </svg>
   );
 }

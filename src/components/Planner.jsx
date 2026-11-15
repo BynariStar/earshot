@@ -8,6 +8,7 @@ import {
 } from '../lib/plan.js';
 import { hearingState, TARGETS } from '../lib/personal.js';
 import { BASES } from '../lib/bases.js';
+import Info from './Info.jsx';
 
 const STATUS = {
   ok: { text: 'Under 60 dBA: no protection needed', cls: 'ok' },
@@ -84,7 +85,13 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
           ))}
         </ul>
         <DayBar result={r} />
-        <p className="muted small">Your day comes from the crew schedule (simulated). Earplug flags: anything above {target.protectAbove} dBA{target.protectAbove < 72 ? ', lowered because your ears changed' : ''}.</p>
+        <p className="muted small">
+          From your crew schedule
+          <Info>
+            The day comes from the crew schedule (simulated; Earshot assumes it is up to date). Earshot flags earplugs for anything above {target.protectAbove} dBA
+            {target.protectAbove < 72 ? ', lowered from 72 dBA because your ears changed' : ''}. Earplugs count as {PLUG_DB.toFixed(1)} dB, from NASA's treadmill figure.
+          </Info>
+        </p>
       </div>
 
       <details className="plan-section">

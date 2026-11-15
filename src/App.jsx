@@ -14,6 +14,7 @@ import Tests from './components/Tests.jsx';
 import SuddenResponse from './components/SuddenResponse.jsx';
 import QuickCheck from './components/QuickCheck.jsx';
 import AlertPage from './components/AlertPage.jsx';
+import TestsMenu from './components/TestsMenu.jsx';
 import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan, applyFlags, normalize, DEFAULT_FILL, DEFAULT_SLEEP } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
@@ -44,7 +45,7 @@ function useRoute() {
   return [route, go];
 }
 
-const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Plan my day', test: 'Hearing test', quick: 'Quick check', about: 'How Earshot works' };
+const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Plan my day', test: 'Hearing test', quick: 'Quick check', about: 'Sources and disclosures' };
 const APP_START = Date.now();
 
 const personaFor = (s) => (!s || s.persona === 'own' ? null : s.persona === 'custom' ? customPersona(s.custom) : personaById(s.persona));
@@ -113,17 +114,17 @@ export default function App() {
   useEffect(() => {
     if (!session) return undefined;
     const id = setInterval(() => {
-      if ((session.events ?? []).some((e) => e.type === 'live')) return;
-      const hit = liveHit(session.station, (Date.now() - liveStart) / 1000);
-      if (!hit) return;
+      const sec = (Date.now() - liveStart) / 1000;
+      const hit = session.youAt ? liveHit(session.station, sec, session.youAt) : liveHit(session.station, sec);
+      if (!hit || (session.events ?? []).some((e) => e.type === 'live' && e.key === hit.key)) return;
       const delta = incidentDelta(hit, spectrumIdOf(session.station, hit.part));
       const cause = hit.kind === 'fault' ? `Likely ${hit.during}, +${delta.toFixed(1)} dBA` : `${hit.during[0].toUpperCase()}${hit.during.slice(1)}`;
-      const e = { type: 'live', part: hit.part, where: partLabel(session.station, hit.part), cause, pitches: incidentPitches(hit), at: Date.now() };
+      const e = { type: 'live', key: hit.key, part: hit.part, where: partLabel(session.station, hit.part), cause, pitches: incidentPitches(hit), at: Date.now() };
       changeSession((prev) => ({ ...prev, events: [...(prev.events ?? []).filter((x) => x.type !== 'live'), e] }));
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.station, session?.events, liveStart]);
+  }, [session?.station, session?.events, session?.youAt, liveStart]);
   const alerts = session
     ? buildAlerts({ station: session.station, data, events: session.events ?? [], plan: planResult, planFlags: flags.flagged, hearing, quick: data.quick ?? [] })
     : [];
@@ -158,7 +159,7 @@ export default function App() {
     changeSession((prev) => ({ ...prev, events: [...(prev.events ?? []).filter((x) => x.type !== e.type), { ...e, at: Date.now() }] }));
   }
   function clearEvents() {
-    setSession({ ...session, events: [], seen: [], liveStart: Date.now() });
+    setSession({ ...session, events: [], seen: [], liveStart: Date.now(), youAt: null });
     if (persona) {
       clearSim(session.persona);
       setData(dataFor(session));
@@ -178,11 +179,10 @@ export default function App() {
   }
   const startTest = (role) => go(`test/${role}`);
 
-  if (!session || section === 'welcome') {
+  if ((!session && section !== 'about') || section === 'welcome') {
     return (
       <div className="app">
-        <Welcome onStart={start} initial={session} />
-        <Footer />
+        <Welcome onStart={start} initial={session} onAbout={() => go('about')} />
       </div>
     );
   }
@@ -201,8 +201,8 @@ export default function App() {
           onChange={() => go('welcome')}
           data={data}
           liveStart={liveStart}
+          onMoveMe={(id) => changeSession((prev) => ({ ...prev, youAt: id }))}
         />
-        <Footer />
         {overlay}
       </div>
     );
@@ -211,8 +211,7 @@ export default function App() {
   const back = section === 'test' ? () => go('ears') : () => go('');
   const earsTab = section === 'ears' ? sub || 'overview' : null;
   const hasSudden = latestCheck(data)?.confirmedFindings?.some((f) => f.kind === 'sudden');
-  const earsTabs = [['overview', 'Overview'], ['tests', 'My tests']];
-  if (hasSudden || earsTab === 'sudden') earsTabs.push(['sudden', 'Sudden drop: act now']);
+  const earsTabs = hasSudden || earsTab === 'sudden' ? [['overview', 'Overview'], ['sudden', 'Sudden drop: act now']] : [];
 
   return (
     <div className="app">
@@ -222,9 +221,10 @@ export default function App() {
         </button>
         <h1>{TITLES[section]}</h1>
         {section === 'ears' && persona && <span className="muted appbar-sub">{persona.name} (simulated)</span>}
+        {section === 'ears' && <TestsMenu data={data} onDelete={deleteTest} />}
       </header>
 
-      {section === 'ears' && (
+      {section === 'ears' && earsTabs.length > 0 && (
         <div className="segmented tabs-ears" role="tablist" aria-label="My ears">
           {earsTabs.map(([k, label]) => (
             <button key={k} role="tab" aria-selected={earsTab === k} className={earsTab === k ? 'on' : ''} onClick={() => go(k === 'overview' ? 'ears' : `ears/${k}`)}>
@@ -236,7 +236,7 @@ export default function App() {
 
       <main>
         {earsTab === 'overview' && (
-          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} />
+          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} earplugs={flags.flagged.map((f) => f.name)} go={go} />
         )}
         {earsTab === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={startTest} />}
         {earsTab === 'sudden' && <SuddenResponse data={data} onRetest={() => go('quick/ringing')} />}
@@ -245,23 +245,13 @@ export default function App() {
         {section === 'quick' && <QuickCheck key={sub} kind={sub || 'general'} data={data} persona={persona} events={session.events ?? []} onSave={saveQuick} onSimulatedFullCheck={simulatedFullCheck} go={go} />}
         {section === 'station' && (
           <Suspense fallback={<p className="muted">Loading the station…</p>}>
-            <Station demoEvents={session.events ?? []} liveStart={liveStart} youStation={session.station} />
+            <Station demoEvents={session.events ?? []} liveStart={liveStart} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={(id) => changeSession((prev) => ({ ...prev, youAt: id }))} />
           </Suspense>
         )}
         {section === 'about' && <About data={data} onReset={() => setData(dataFor(session))} />}
         {section === 'plan' && <Planner plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} />}
       </main>
-      <Footer />
       {overlay}
     </div>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="footer">
-      Research prototype for NASA Space Apps 2026, not a medical device. Your results stay on this device. AI-assisted: code largely written with
-      Claude (Anthropic), reviewed by team Earshot.
-    </footer>
   );
 }

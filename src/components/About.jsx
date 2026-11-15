@@ -28,16 +28,14 @@ const SOURCES = [
 export default function About({ data, onReset }) {
   return (
     <section className="panel about">
-      <h1>How Earshot works, and where it comes from</h1>
-      <p>
-        Earshot measures how quiet a tone you can hear at six pitches in each ear, and compares it with your own baseline taken on the same
-        headphones at the same volume. Consumer headphones aren't calibrated, so it never reports absolute hearing levels, only change, which
-        is also how NASA compares in-flight tests.
-      </p>
-      <p>
-        A change counts only if a retest repeats it, because 10 dB is about two standard deviations of portable-test error (Wexler et al.
-        2026). Tones are capped at 20 dB below the device's full scale, and you set a comfortable volume once and leave it.
-      </p>
+      <h2>Disclosures</h2>
+      <ul>
+        <li><strong>Not a medical device.</strong> A research prototype for NASA Space Apps 2026. It doesn't diagnose or treat anything; decisions stay with the crew medical officer and the flight surgeon.</li>
+        <li><strong>Change, not absolute hearing.</strong> Consumer headphones aren't calibrated, so Earshot compares each test with your own baseline on the same headphones and volume, the way NASA compares in-flight tests. A change counts only if a retest repeats it (10 dB is about two standard deviations of portable-test error, Wexler et al. 2026).</li>
+        <li><strong>Simulated parts.</strong> The crew members, the live feed, the crew location and schedule, and the Moon and Mars bases are simulated from the NASA sources below and labelled in the app.</li>
+        <li><strong>Your data stays here.</strong> Results are stored in this browser only. Nothing is uploaded.</li>
+        <li><strong>AI-assisted.</strong> The code was largely written with Claude (Anthropic) and reviewed and directed by team Earshot, as the Space Apps rules require us to disclose.</li>
+      </ul>
       <h2>Sources</h2>
       <ul className="sources">
         {SOURCES.map(([title, url, use]) => (
@@ -48,7 +46,7 @@ export default function About({ data, onReset }) {
         ))}
       </ul>
       <h2>Your data</h2>
-      <p>{data.tests.length} test(s) stored in this browser only. Nothing is uploaded.</p>
+      <p>{data.tests.length} test(s) stored in this browser.</p>
       <button
         className="secondary"
         onClick={() => {

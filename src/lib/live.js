@@ -109,7 +109,6 @@ export const partLabel = (station, id) => partsOf(station).find((p) => p.id === 
 export const spectrumIdOf = (station, id) => (BASES[station] ? BASES[station].parts.find((p) => p.id === id)?.iss ?? id : id);
 
 // An incident in the area where the crew member is right now, or null.
-export function liveHit(station, s) {
-  const here = whereAt(station, s);
+export function liveHit(station, s, here = whereAt(station, s)) {
   return liveFrame(station, s).active.find((x) => x.part === here) ?? null;
 }

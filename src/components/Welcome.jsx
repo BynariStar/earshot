@@ -11,7 +11,7 @@ const STATION_NOTES = {
   mars: "Simulated: the rooms of NASA's CHAPEA Mars analog.",
 };
 
-export default function Welcome({ onStart, initial }) {
+export default function Welcome({ onStart, initial, onAbout }) {
   const [station, setStation] = useState(initial?.station ?? 'iss');
   const [persona, setPersona] = useState(initial?.persona ?? 'high');
   const [custom, setCustom] = useState(initial?.custom ?? { age: 45, sex: 'female', condition: 'high', ear: 'left' });
@@ -92,6 +92,9 @@ export default function Welcome({ onStart, initial }) {
         <button className="primary" onClick={() => onStart({ station, persona, events: [], ...(persona === 'custom' ? { custom } : {}) })}>Start</button>
         
       </div>
+      <p className="muted small welcome-foot">
+        Research prototype, not a medical device. <button className="link-button inline-link" onClick={onAbout}>Sources and disclosures</button>
+      </p>
     </div>
   );
 }

@@ -15,12 +15,14 @@ import SuddenResponse from './components/SuddenResponse.jsx';
 import QuickCheck from './components/QuickCheck.jsx';
 import AlertPage from './components/AlertPage.jsx';
 import TestsMenu from './components/TestsMenu.jsx';
+import TabBar from './components/TabBar.jsx';
+import AlertsSheet from './components/AlertsSheet.jsx';
 import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan, applyFlags, normalize, DEFAULT_FILL, DEFAULT_SLEEP } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
 import { personaById, customPersona, simulatedThresholds } from './lib/personas.js';
 import { hearingState, TARGETS } from './lib/personal.js';
-import { buildAlerts } from './lib/alerts.js';
+import { buildAlerts, alertKey as bellKey } from './lib/alerts.js';
 import { liveHit, incidentPitches, incidentDelta, partLabel, spectrumIdOf } from './lib/live.js';
 import About from './components/About.jsx';
 import { evaluate, averageBaselines } from './lib/rules.js';
@@ -159,6 +161,34 @@ export default function App() {
     }
   }
   const overlay = pageAlert && <AlertPage alert={pageAlert} onAct={(x) => actOnAlert(pageAlert, x)} onDismiss={() => dismissAlert(pageAlert)} />;
+  // Alerts tab: opening it marks everything seen; the badge counts only new items, in the most severe colour.
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [fresh, setFresh] = useState([]);
+  const bellList = alerts.filter((a) => !(session?.done ?? []).includes(bellKey(a)));
+  const unseen = bellList.filter((a) => !(session?.bellSeen ?? []).includes(bellKey(a)));
+  const badgeLevel = unseen.some((x) => x.level === 'urgent') ? 'urgent' : unseen.some((x) => x.level === 'warn') ? 'warn' : 'info';
+  const openAlerts = () => {
+    setFresh(unseen.map(bellKey));
+    markSeen(bellList.map(bellKey));
+    setAlertsOpen(true);
+  };
+  const showTabs = session && section !== 'test' && section !== 'quick';
+  const chrome = (
+    <>
+      {showTabs && <TabBar section={section} go={go} onAlerts={openAlerts} badge={unseen.length} badgeLevel={badgeLevel} />}
+      {alertsOpen && (
+        <AlertsSheet
+          alerts={bellList}
+          fresh={fresh}
+          onDone={markDone}
+          onUndo={(k) => changeSession((prev) => ({ ...prev, done: (prev.done ?? []).filter((x) => x !== k) }))}
+          onAct={(x) => (x.event ? addEvent(x.event) : go(x.to))}
+          onClose={() => setAlertsOpen(false)}
+        />
+      )}
+      {overlay}
+    </>
+  );
 
   function start(s) {
     setSession({ ...s, seen: [], bellSeen: [], done: [], liveStart: Date.now(), pausedAt: null });
@@ -204,7 +234,6 @@ export default function App() {
         <StationHome
           session={session}
           persona={persona}
-          alerts={alerts}
           go={go}
           focus={section === 'home' ? sub : null}
           onEvent={addEvent}
@@ -214,11 +243,9 @@ export default function App() {
           liveStart={liveStart}
           pausedAt={session.pausedAt ?? null}
           onTogglePause={togglePause}
-          onSeen={markSeen}
-          onDone={markDone}
           onMoveMe={(id) => changeSession((prev) => ({ ...prev, youAt: id }))}
         />
-        {overlay}
+        {chrome}
       </div>
     );
   }
@@ -266,7 +293,7 @@ export default function App() {
         {section === 'about' && <About data={data} onReset={() => setData(dataFor(session))} />}
         {section === 'plan' && <Planner plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} />}
       </main>
-      {overlay}
+      {chrome}
     </div>
   );
 }

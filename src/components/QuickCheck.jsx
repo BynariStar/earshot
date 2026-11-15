@@ -110,7 +110,7 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
         ) : (
           <p>Nothing to do. Earshot keeps watching.</p>
         )}
-        <button className="link-button" onClick={() => go('ears')}>Back to my ears</button>
+        <button className="secondary" onClick={() => go("ears")}>Back to my ears</button>
       </section>
     );
   }
@@ -122,12 +122,14 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
         2 minutes, both ears.
         <Info>Why these pitches: {WHY[kind] ?? WHY.general}. Use the same headphones and volume as your baseline, in the quietest spot you can find.</Info>
       </p>
-      <div className="row-buttons left">
-        {persona ? (
-          <button className="primary" onClick={runSimulated}>Simulate {persona.name}'s responses</button>
-        ) : (
-          <button className="primary" onClick={() => setStage('running')}>Start (headphones on)</button>
-        )}
+      <div className="action-bar no-tabs">
+        <div className="action-bar-inner">
+          {persona ? (
+            <button className="primary" onClick={runSimulated}>Simulate {persona.name}'s responses</button>
+          ) : (
+            <button className="primary" onClick={() => setStage('running')}>Start (headphones on)</button>
+          )}
+        </div>
       </div>
     </section>
   );

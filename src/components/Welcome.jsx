@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { STATIONS } from '../lib/session.js';
 import { PERSONAS, CONDITIONS, ageOffsetDb } from '../lib/personas.js';
+import Stepper from './Stepper.jsx';
 
 const STATION_NOTES = {
   iss: "NASA's measured module levels and spectra (2022–2024).",
@@ -61,25 +62,26 @@ export default function Welcome({ onStart, initial, onAbout }) {
       </div>
       {persona === 'custom' && (
         <div className="custom-form">
-          <label>Age <input type="number" min="25" max="65" value={custom.age} onChange={(e) => setC({ age: Math.max(25, Math.min(65, Number(e.target.value) || 25)) })} /></label>
-          <label>Sex
-            <select value={custom.sex} onChange={(e) => setC({ sex: e.target.value })}>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-            </select>
-          </label>
-          <label>Ears
-            <select value={custom.condition} onChange={(e) => setC({ condition: e.target.value })}>
-              {CONDITIONS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
-          </label>
+          <Stepper label="Age" value={custom.age} step={1} min={25} max={65} presets={[30, 45, 60]} unit="" format={(v) => `${v}`} onChange={(v) => setC({ age: v })} />
+          <div className="field">
+            <span>Sex</span>
+            <div className="segmented">
+              {[['female', 'Female'], ['male', 'Male']].map(([v, l]) => <button key={v} className={custom.sex === v ? 'on' : ''} onClick={() => setC({ sex: v })}>{l}</button>)}
+            </div>
+          </div>
+          <div className="field">
+            <span>Ears</span>
+            <div className="segmented wrap">
+              {CONDITIONS.map((c) => <button key={c.id} className={custom.condition === c.id ? 'on' : ''} onClick={() => setC({ condition: c.id })}>{c.label}</button>)}
+            </div>
+          </div>
           {custom.condition !== 'steady' && (
-            <label>Which ear
-              <select value={custom.ear} onChange={(e) => setC({ ear: e.target.value })}>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
-              </select>
-            </label>
+            <div className="field">
+              <span>Which ear</span>
+              <div className="segmented">
+                {[['left', 'Left'], ['right', 'Right']].map(([v, l]) => <button key={v} className={custom.ear === v ? 'on' : ''} onClick={() => setC({ ear: v })}>{l}</button>)}
+              </div>
+            </div>
           )}
           <p className="muted small">
             Age sets the starting hearing at high pitches from NASA's astronaut hearing-by-age table (LSAH):{' '}

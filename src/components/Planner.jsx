@@ -9,6 +9,8 @@ import {
 import { hearingState, TARGETS } from '../lib/personal.js';
 import { BASES } from '../lib/bases.js';
 import Info from './Info.jsx';
+import Stepper from './Stepper.jsx';
+import Picker from './Picker.jsx';
 
 const STATUS = {
   ok: { text: 'Under 60 dBA: no protection needed', cls: 'ok' },
@@ -98,63 +100,59 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
         <summary>Change the day</summary>
         <div className="planner-inputs">
           <h4>Loud activities</h4>
-          {ACTIVITIES.map((a) => {
-            const v = plan.activities[a.id] ?? 0;
-            return (
-              <div key={a.id} className="activity-row">
-                <label className="slider">
-                  <span>{a.id === 't2' ? 'T2 treadmill' : a.name} <em>{a.dba} dBA</em></span>
-                  <input type="range" min="0" max={MAX_ACTIVITY_MIN} step="15" value={v} onChange={(e) => setPlan(setActivity(plan, a.id, Number(e.target.value)))} />
-                  <span className="val">{v} min</span>
-                </label>
-              </div>
-            );
-          })}
+          {ACTIVITIES.map((a) => (
+            <Stepper
+              key={a.id}
+              label={`${a.id === 't2' ? 'T2 treadmill' : a.name} · ${a.dba} dBA`}
+              value={plan.activities[a.id] ?? 0}
+              step={15}
+              min={0}
+              max={MAX_ACTIVITY_MIN}
+              presets={[0, 30, 60, 90]}
+              onChange={(v) => setPlan(setActivity(plan, a.id, v))}
+            />
+          ))}
 
           <h4>Where you'll work</h4>
           {plan.places.map((pl, i) => (
-            <div key={i} className="place-row">
-              <select value={pl.id} onChange={(e) => set({ places: plan.places.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })}>
-                {places.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.dba} dBA)</option>)}
-              </select>
-              <input type="range" min="0" max="480" step="30" value={pl.minutes} onChange={(e) => setPlan(setPlaceMinutes(plan, i, Number(e.target.value)))} aria-label="Hours" />
-              <span className="val">{hm(pl.minutes)}</span>
-              <button className="link-button" onClick={() => set({ places: plan.places.filter((_, j) => j !== i) })} aria-label="Remove place">Remove</button>
+            <div key={i} className="place-block">
+              <Picker
+                label="Place"
+                value={pl.id}
+                options={places.map((o) => ({ value: o.id, label: o.name, note: `${o.dba} dBA` }))}
+                onChange={(v) => set({ places: plan.places.map((x, j) => (j === i ? { ...x, id: v } : x)) })}
+              />
+              <Stepper label="Time there" value={pl.minutes} step={30} min={0} max={480} presets={[60, 120, 240]} format={hm} onChange={(v) => setPlan(setPlaceMinutes(plan, i, v))} />
+              <button className="secondary" onClick={() => set({ places: plan.places.filter((_, j) => j !== i) })}>Remove this place</button>
             </div>
           ))}
-          <button className="secondary small-btn" disabled={left <= 0} onClick={() => setPlan(setPlaceMinutes({ ...plan, places: [...plan.places, { id: places[0].id, minutes: 0 }] }, plan.places.length, 120))}>
+          <button className="secondary" disabled={left <= 0} onClick={() => setPlan(setPlaceMinutes({ ...plan, places: [...plan.places, { id: places[0].id, minutes: 0 }] }, plan.places.length, 120))}>
             + Add a place
           </button>
-          <label className="select fill-row">
-            The rest ({hm(left)}) in
-            <select value={plan.fill} onChange={(e) => set({ fill: e.target.value })}>
-              {places.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.dba} dBA)</option>)}
-            </select>
-          </label>
+          <div className="fill-block">
+            <Picker
+              label={`The rest (${hm(left)})`}
+              value={plan.fill}
+              options={places.map((o) => ({ value: o.id, label: o.name, note: `${o.dba} dBA` }))}
+              onChange={(v) => set({ fill: v })}
+            />
+          </div>
           <h4>Earphones</h4>
           {plan.audio.minutes > 0 ? (
             <>
-              <label className="slider">
-                <span>Listening time</span>
-                <input type="range" min="0" max="240" step="15" value={plan.audio.minutes} onChange={(e) => set({ audio: { ...plan.audio, minutes: Number(e.target.value) } })} />
-                <span className="val">{plan.audio.minutes} min</span>
-              </label>
-              <label className="slider">
-                <span>Level at your ear (estimate)</span>
-                <input type="range" min="60" max="100" step="5" value={plan.audio.dba} onChange={(e) => set({ audio: { ...plan.audio, dba: Number(e.target.value) } })} />
-                <span className="val">{plan.audio.dba} dBA</span>
-              </label>
+              <Stepper label="Listening time" value={plan.audio.minutes} step={15} min={0} max={240} presets={[30, 60, 120]} onChange={(v) => set({ audio: { ...plan.audio, minutes: v } })} />
+              <Stepper label="Level at your ear (estimate)" value={plan.audio.dba} step={5} min={60} max={100} presets={[70, 80, 90]} unit="dBA" onChange={(v) => set({ audio: { ...plan.audio, dba: v } })} />
             </>
           ) : (
-            <button className="secondary small-btn" onClick={() => set({ audio: { ...plan.audio, minutes: 60 } })}>+ Add earphones</button>
+            <button className="secondary" onClick={() => set({ audio: { ...plan.audio, minutes: 60 } })}>+ Add earphones</button>
           )}
           <h4>Sleep (8 h)</h4>
-          <label className="select">
-            Sleep in
-            <select value={plan.sleepAt} onChange={(e) => set({ sleepAt: e.target.value })}>
-              {sleeps.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.dba} dBA)</option>)}
-            </select>
-          </label>
+          <Picker
+            label="Sleep in"
+            value={plan.sleepAt}
+            options={sleeps.map((m) => ({ value: m.id, label: m.name, note: `${m.dba} dBA` }))}
+            onChange={(v) => set({ sleepAt: v })}
+          />
         </div>
       </details>
 

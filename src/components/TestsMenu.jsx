@@ -1,7 +1,8 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
 // "Tests (n) ▾" in the top bar: one line per test, newest first; tap a line for its numbers or to delete it.
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import Sheet from './Sheet.jsx';
 import { averageBaselines, shifts, isNoResponse } from '../lib/rules.js';
 import { baselineTests, isNoisy } from '../lib/storage.js';
 import Info from './Info.jsx';
@@ -28,23 +29,16 @@ export default function TestsMenu({ data, onDelete }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [confirm, setConfirm] = useState(null);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDown = (e) => !ref.current?.contains(e.target) && setOpen(false);
-    window.addEventListener('pointerdown', onDown);
-    return () => window.removeEventListener('pointerdown', onDown);
-  }, [open]);
   const tests = [...data.tests].filter((t) => t.complete).reverse();
   const baselines = baselineTests(data);
   const reference = baselines.length >= 2 ? averageBaselines(baselines[0].thresholds, baselines[1].thresholds) : null;
   return (
-    <div className="tests-menu" ref={ref}>
-      <button className="secondary small-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        Tests ({tests.length}) <span aria-hidden="true">▾</span>
+    <div className="tests-menu">
+      <button className="secondary" onClick={() => setOpen(true)}>
+        Tests ({tests.length}) <span aria-hidden="true">›</span>
       </button>
       {open && (
-        <div className="popover-body tests-pop">
+        <Sheet title={`Tests (${tests.length})`} onClose={() => setOpen(false)}>
           {tests.length === 0 && <p className="muted small">No tests yet.</p>}
           {tests.map((t) => {
             const bIndex = baselines.findIndex((b) => b.id === t.id);
@@ -53,10 +47,11 @@ export default function TestsMenu({ data, onDelete }) {
             const isOpen = expanded === t.id;
             return (
               <div key={t.id} className={`test-row${isOpen ? ' open' : ''}`}>
-                <button className="test-line" onClick={() => setExpanded(isOpen ? null : t.id)}>
+                <button className="test-line row" onClick={() => setExpanded(isOpen ? null : t.id)}>
                   <span className="muted">{when}</span> <strong>{name}</strong>
                   <span className="muted"> {summary(t, reference) ?? ''}</span>
                   {isNoisy(t) && <span className="warn-text"> · noisy room</span>}
+                  <span aria-hidden="true" className="chev">{isOpen ? '⌄' : '›'}</span>
                 </button>
                 {isOpen && (
                   <div className="test-detail">
@@ -85,21 +80,23 @@ export default function TestsMenu({ data, onDelete }) {
                         {t.headphones || 'Headphones not recorded'}
                         <Info align="left">Earshot's own uncalibrated scale (dB; higher = harder to hear). Only differences between your own tests mean anything. Small numbers: change from your baseline. NR: no response at the loudest level.</Info>
                       </span>
-                      {confirm === t.id ? (
-                        <span className="small">
-                          Delete this test? <button className="link-button inline-link danger" onClick={() => { onDelete(t.id); setConfirm(null); setExpanded(null); }}>Delete</button>{' '}
-                          <button className="link-button inline-link" onClick={() => setConfirm(null)}>Keep</button>
-                        </span>
-                      ) : (
-                        <button className="link-button inline-link" onClick={() => setConfirm(t.id)}>Delete</button>
-                      )}
+                      {confirm !== t.id && <button className="secondary" onClick={() => setConfirm(t.id)}>Delete…</button>}
                     </div>
+                    {confirm === t.id && (
+                      <div className="confirm-row">
+                        <span>Delete this test? This can't be undone.</span>
+                        <div className="confirm-buttons">
+                          <button className="secondary" onClick={() => setConfirm(null)}>Keep</button>
+                          <button className="danger-btn" onClick={() => { onDelete(t.id); setConfirm(null); setExpanded(null); }}>Delete</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
-        </div>
+        </Sheet>
       )}
     </div>
   );

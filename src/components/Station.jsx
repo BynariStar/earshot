@@ -118,6 +118,8 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   }, [mode, liveStart, pausedAt]);
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 700);
   const [hover, setHover] = useState(null);
+  const [viewCtl, setViewCtl] = useState(false);
+  const view = useRef(null);
   const [wide, setWide] = useState(() => window.innerWidth > 700);
   useEffect(() => {
     const on = () => setWide(window.innerWidth > 700);
@@ -246,6 +248,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           highlight={live ? highlights : faultModule ?? (base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined)}
           you={you}
           offsetRight={panelShift}
+          viewRef={view}
         />
 
         <div className="map-overlay map-tl">
@@ -272,9 +275,23 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
             options={place === 'chamber' ? [['now', 'Day'], ['avg', 'Average']] : [['live', 'Live'], ['now', 'Day'], ['avg', 'Average']]}
           />
         </div>
+        <div className="map-overlay map-br">
+          {viewCtl && (
+            <div className="view-ctl" role="group" aria-label="Map view controls">
+              <button className="map-icon" onClick={() => view.current?.rotate(-1)} aria-label="Turn left">⟲</button>
+              <button className="map-icon" onClick={() => view.current?.rotate(1)} aria-label="Turn right">⟳</button>
+              <button className="map-icon" onClick={() => view.current?.zoom(0.8)} aria-label="Zoom in">+</button>
+              <button className="map-icon" onClick={() => view.current?.zoom(1.25)} aria-label="Zoom out">−</button>
+              <button className="map-icon" onClick={() => view.current?.reset()} aria-label="Reset view">⌂</button>
+            </div>
+          )}
+          <button className={`map-icon${viewCtl ? ' on' : ''}`} onClick={() => setViewCtl((v) => !v)} aria-pressed={viewCtl} aria-label="Map buttons: turn and zoom">✥</button>
+        </div>
         {you && (
           <div className="map-overlay map-bl">
-            <span className="you-dot" aria-hidden="true" /> You: <button className="link-button inline-link" onClick={() => pick(you)}>{partLabel(you)}</button>
+            <button className="you-btn" onClick={() => pick(you)}>
+              <span className="you-dot" aria-hidden="true" /> You: <strong>{partLabel(you)}</strong>
+            </button>
           </div>
         )}
 
@@ -282,7 +299,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           <aside className="map-panel" aria-label={sel ? `${sel.label} details` : 'What is happening now'}>
             <div className="panel-head">
               {sel ? (
-                live || faultModule ? <button className="link-button inline-link" onClick={() => setSelected(null)}>‹ Now</button> : <span />
+                live || faultModule ? <button className="secondary back-now" onClick={() => setSelected(null)}>‹ Now</button> : <span />
               ) : (
                 <span className="label-caps">Now</span>
               )}
@@ -343,9 +360,11 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
                     <ul className="feed">
                       {frame.log.map((e) => (
                         <li key={`${e.key}-${e.type}`} className={`feed-${e.type}`}>
-                          <span className="muted">{clockAt(e.at)}</span>{' '}
-                          <button className="link-button inline-link" onClick={() => pick(e.inc.part)} onMouseEnter={() => setHover(e.inc.part)} onMouseLeave={() => setHover(null)}>{partLabel(e.inc.part)}</button>{' '}
-                          {e.type === 'start' ? e.inc.what : `${e.inc.fix}, back to normal`}
+                          <button className="feed-row" onClick={() => pick(e.inc.part)} onMouseEnter={() => setHover(e.inc.part)} onMouseLeave={() => setHover(null)}>
+                            <span className="muted">{clockAt(e.at)}</span>
+                            <span><strong>{partLabel(e.inc.part)}</strong> {e.type === 'start' ? e.inc.what : `${e.inc.fix}, back to normal`}</span>
+                            <span className="chev" aria-hidden="true">›</span>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -364,15 +383,18 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
       </div>
       <div className="legend-bar" aria-label="Colour key">
         {NOISE_BINS.map((b) => (
-          <span key={b.label}><i style={{ background: b.color }} />{b.label.replace(' (sleep target)', '')}</span>
+          <span key={b.label}><i style={{ background: b.color }} />{['Quiet', 'Moderate', 'Loud', 'Very loud'][NOISE_BINS.indexOf(b)]} {b.label.replace(' (sleep target)', '').replace(' dBA', '')}</span>
         ))}
-        {place !== 'chamber' && <span><i style={{ background: NO_DATA_COLOR }} />no value</span>}
+        {place !== 'chamber' && <span><i style={{ background: NO_DATA_COLOR }} />No value</span>}
+        <span className="muted">dBA</span>
       </div>
       {mode === 'now' && (
         <div className="timebar">
           <button className="secondary play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play the day'}>
             {playing ? '❚❚' : '▶'}
           </button>
+          <button className="secondary step-hour" onClick={() => { setT((x) => (x + 1380) % 1440); setPlaying(false); }} aria-label="One hour earlier">−1 h</button>
+          <button className="secondary step-hour" onClick={() => { setT((x) => (x + 60) % 1440); setPlaying(false); }} aria-label="One hour later">+1 h</button>
           <input type="range" min="0" max="1435" step="5" value={t} onChange={(e) => { setT(Number(e.target.value)); setPlaying(false); }} aria-label="Time of day" />
           <span className="clock">{clock(t)}</span>
         </div>

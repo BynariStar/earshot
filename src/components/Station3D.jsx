@@ -106,7 +106,7 @@ function makeYouMarker() {
   return sprite;
 }
 
-export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null, offsetRight = 0 }) {
+export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null, offsetRight = 0, viewRef }) {
   const mountRef = useRef(null);
   const markerRef = useRef(null);
   const camRef = useRef(null);
@@ -182,17 +182,47 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     mount.appendChild(hint);
     controls.addEventListener('start', () => hint.classList.add('gone'));
 
+    // Optional on-map buttons (behind a toggle): turn, zoom, reset, without dragging.
+    const home = cam.position.clone();
+    if (viewRef) {
+      viewRef.current = {
+        rotate: (dir) => {
+          const off = cam.position.clone().sub(controls.target);
+          off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (dir * Math.PI) / 8);
+          cam.position.copy(controls.target).add(off);
+        },
+        zoom: (f) => {
+          const off = cam.position.clone().sub(controls.target).multiplyScalar(f);
+          const len = Math.min(controls.maxDistance, Math.max(controls.minDistance, off.length()));
+          cam.position.copy(controls.target).add(off.setLength(len));
+        },
+        reset: () => {
+          cam.position.copy(home);
+          controls.target.set(...target);
+        },
+      };
+    }
+
     // Tap / click to select (ignore drags).
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     let down = null;
     const onDown = (e) => (down = { x: e.clientX, y: e.clientY });
     const onUp = (e) => {
-      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) return;
       const rect = renderer.domElement.getBoundingClientRect();
       ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-      ray.setFromCamera(ndc, cam);
-      const hit = ray.intersectObjects(Object.values(meshes), false)[0];
+      const tryAt = (dx, dy) => {
+        ndc.set(((e.clientX + dx - rect.left) / rect.width) * 2 - 1, -((e.clientY + dy - rect.top) / rect.height) * 2 + 1);
+        ray.setFromCamera(ndc, cam);
+        return ray.intersectObjects(Object.values(meshes), false)[0];
+      };
+      // A tap that lands slightly off a module still selects it: try rings of nearby points.
+      let hit = tryAt(0, 0);
+      for (const r of [14, 26, 38]) {
+        if (hit) break;
+        for (let k = 0; k < 8 && !hit; k++) hit = tryAt(r * Math.cos((k * Math.PI) / 4), r * Math.sin((k * Math.PI) / 4));
+      }
       if (hit) onSelectRef.current?.(hit.object.userData.id);
     };
     // Hover label: name and level of the part under the pointer.

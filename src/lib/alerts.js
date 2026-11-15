@@ -22,6 +22,7 @@ export function quickPitchesFor(event) {
   return [2000, 3000, 4000]; // loud exposure, e.g. treadmill without earplugs
 }
 
+export const alertKey = (a) => `${a.id}:${a.title}`;
 const listJoin = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 
 // Every alert is listed behind the bell. Only `popup` alerts also open full screen (once): a confirmed sudden

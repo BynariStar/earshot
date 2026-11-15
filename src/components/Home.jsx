@@ -127,9 +127,11 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
             <Info>{`Canadian Space Agency PRET open data: ${cog.detail}`}</Info>
           </p>
         )}
-        <div className="row-buttons left">
-          {reference && <button className="primary" onClick={() => go('quick/general')}>Quick check · 2 min</button>}
-          {cta && <button className="secondary" onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
+        <div className="action-bar">
+          <div className="action-bar-inner">
+            {reference && <button className="primary" onClick={() => go('quick/general')}>Quick check · 2 min</button>}
+            {cta && <button className={reference ? 'secondary' : 'primary'} onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
+          </div>
         </div>
       </div>
 
@@ -143,7 +145,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
                 <button className="sheet-close" onClick={() => setPicked(null)} aria-label="Close">×</button>
                 <strong>{info.label}</strong>
                 <p className={`status-text ${status}`}>
-                  {STATUS_TEXT[status]}
+                  <span className="status-icon" aria-hidden="true">{{ ok: '✓', watch: '◐', shift: '▲', urgent: '!', unmeasurable: '–', untested: '○' }[status]}</span> {STATUS_TEXT[status]}
                   {Number.isFinite(delta) && status !== 'unmeasurable' && status !== 'untested' ? ` (${delta > 0 ? '+' : ''}${delta.toFixed(0)} dB)` : ''}
                 </p>
                 <p className="muted small">{info.hears}</p>

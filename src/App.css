@@ -1072,3 +1072,7 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 }
 .ears-trend { grid-column: 1 / -1; }
 .ears-trend .trend { margin-top: 4px; }
+/* Leader line + dot when a map marker had to move off its module. */
+.callout-leader { position: absolute; left: 0; top: 0; height: 2px; transform-origin: 0 50%; background: var(--urgent); opacity: 0.85; pointer-events: none; }
+.callout-anchor { position: absolute; left: 0; top: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--urgent); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6); pointer-events: none; }
+.callout-leader.trend, .callout-anchor.trend { background: var(--watch); }

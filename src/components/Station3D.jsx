@@ -287,6 +287,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
         v.set((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2).project(cam);
         if (v.z > 1) {
           c.el.style.display = 'none';
+          c.line.style.display = 'none';
+          c.dot.style.display = 'none';
           continue;
         }
         c.el.style.display = '';
@@ -320,6 +322,24 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
           }
         }
         const { x, y } = best;
+        // Moved off its anchor: a leader line and a dot tie the marker back to its module.
+        const ax = ((v.x + 1) / 2) * w;
+        const ay = ((1 - v.y) / 2) * h;
+        const tipX = x + cw / 2;
+        const tipY = y + ch + 7;
+        const moved = Math.hypot(x - x0, y - y0) > 4;
+        if (moved) {
+          const len = Math.hypot(ax - tipX, ay - tipY);
+          const ang = Math.atan2(ay - tipY, ax - tipX);
+          c.line.style.display = '';
+          c.line.style.width = `${Math.round(len)}px`;
+          c.line.style.transform = `translate(${Math.round(tipX)}px, ${Math.round(tipY)}px) rotate(${ang}rad)`;
+          c.dot.style.display = '';
+          c.dot.style.transform = `translate(${Math.round(ax - 5)}px, ${Math.round(ay - 5)}px)`;
+        } else {
+          c.line.style.display = 'none';
+          c.dot.style.display = 'none';
+        }
         placed.push({ x, y, w: cw, h: ch });
         c.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
       }
@@ -430,8 +450,14 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
         onCalloutRef.current?.(c.id);
       });
       el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      const line = document.createElement('div');
+      line.className = `callout-leader${c.kind ? ` ${c.kind}` : ''}`;
+      const dot = document.createElement('div');
+      dot.className = `callout-anchor${c.kind ? ` ${c.kind}` : ''}`;
+      layer.appendChild(line);
+      layer.appendChild(dot);
       layer.appendChild(el);
-      return { id: c.id, el, lift: c.id === you ? 58 : 12, open: !!c.open };
+      return { id: c.id, el, line, dot, lift: c.id === you ? 58 : 12, open: !!c.open };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calloutKey, parts, you]);

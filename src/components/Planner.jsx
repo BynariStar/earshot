@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { noiseColor } from '../lib/issLayout.js';
 import Sheet from './Sheet.jsx';
 import {
-  ACTIVITIES, MAX_ACTIVITY_MIN, WORKDAY_MIN, PLUG_DB, T2, DEFAULT_FILL, DEFAULT_SLEEP, computePlan, applyFlags, setActivity, setPlaceMinutes, placeOptions, sleepOptions, normalize,
+  ACTIVITIES, MAX_ACTIVITY_MIN, WORKDAY_MIN, PLUG_DB, T2, DEFAULT_FILL, timeline, nextFlagged, clockOf, DEFAULT_SLEEP, computePlan, applyFlags, setActivity, setPlaceMinutes, placeOptions, sleepOptions, normalize,
 } from '../lib/plan.js';
 import { hearingState, TARGETS } from '../lib/personal.js';
 import { BASES } from '../lib/bases.js';
@@ -59,6 +59,26 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
   if (live && !flagged.some((f) => f.id === live.part)) earplugs.push(`${live.where.replace(/^.*\((.*)\)$/, '$1')} until it's fixed`);
   const exposure = alerts.find((a) => a.id === 'exposure');
   const sleepOk = r.sleepModule.dba <= 50;
+  const items = timeline(r);
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const next = nextFlagged(items, nowMin);
+  const times = Object.fromEntries(items.map((s) => [s.id, `${clockOf(s.start)}–${clockOf(s.end)}`]));
+  const loudToday = events.some((e) => e.type === 'loud' || e.type === 'live');
+  const cqFan = /^cq_/.test(plan.sleepAt);
+  // When to check next: after a loud exposure, tonight; after a 10+ dB quick-check change, tomorrow; a pitch on
+  // watch, in 3 days; steady, in 30 days.
+  const lastQuick = (data.quick ?? [])[0];
+  const nextCheck = exposure
+    ? { title: 'Hearing check tonight', body: exposure.body, to: exposure.actions[0].to, label: 'Quick check', urgent: true }
+    : lastQuick?.worst >= 30
+      ? { title: 'Full check now', body: 'Your last quick check found a drop of 30 dB or more.', to: 'ears', label: 'My ears', urgent: true }
+      : lastQuick?.worst >= 10
+        ? { title: 'Recheck tomorrow', body: `Your last quick check was ${lastQuick.worst} dB worse at ${lastQuick.worstAt >= 1000 ? `${lastQuick.worstAt / 1000} kHz` : `${lastQuick.worstAt} Hz`}. Often temporary after noise.`, urgent: false }
+        : hs.state === 'none'
+          ? { title: 'Set your baseline', body: 'Two 8-minute tests on your own headphones.', to: 'test/baseline', label: 'Start', urgent: true }
+          : hs.state === 'steady'
+            ? { title: 'Next check: in 30 days', body: 'Your ears are steady. Earshot asks sooner after any loud exposure.', urgent: false }
+            : { title: 'Next check: in 3 days', body: 'A pitch is on watch, so Earshot checks more often until it settles.', urgent: false };
   const editTitle = !editing ? '' : { activity: editing.id === 't2' ? 'T2 treadmill' : 'ARED exercise', place: 'Place', fill: 'The rest of the workday', audio: 'Earphones', sleep: 'Where you sleep', add: 'Add to the day' }[editing.type];
   const quietest = [...sleeps].sort((a, b) => a.dba - b.dba)[0];
   const checks = [
@@ -93,6 +113,7 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
             <div>
               <strong>{earplugs.length ? `Earplugs for ${listJoin(earplugs)}` : 'No earplugs needed today'}</strong>
               <span className="muted">
+                {next ? `Next: ${shortName(next.name)} at ${clockOf(next.start)}. ` : ''}
                 {earplugs.length ? `With them, today uses ${pct}% of your noise allowance; without them, ${Math.round(skip.dosePct)}%.` : `Today uses ${pct}% of your noise allowance.`}
                 <Info>
                   Earshot flags anything above {target.protectAbove} dBA{target.protectAbove < 72 ? ' (lowered from 72 dBA because your ears changed)' : ' (Flight Rule B13-152 requires protection above 72 dBA)'}, and any module with a live fault. Earplugs
@@ -101,14 +122,31 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
               </span>
             </div>
           </li>
+          {loudToday && (
+            <li>
+              <span className="rec-icon todo" aria-hidden="true">!</span>
+              <div>
+                <strong>Hearing rest tonight</strong>
+                <span className="muted">
+                  After today's loud exposure, keep the evening and night under 62 dBA so your ears can recover.
+                  <Info>Flight Rule B13-152 counts 62 dBA or less as hearing rest; NASA's sleep target is 50 dBA.</Info>
+                </span>
+              </div>
+            </li>
+          )}
           <li>
             <span className={`rec-icon${sleepOk ? '' : ' todo'}`} aria-hidden="true">{sleepOk ? '✓' : '!'}</span>
             <div>
-              <strong>{sleepOk ? `Sleep in ${r.sleepModule.name}` : `Sleep in ${quietest.name}`}</strong>
+              <strong>{sleepOk ? `Sleep in ${r.sleepModule.name}` : cqFan ? 'Set your crew-quarters fan to low' : `Sleep in ${quietest.name}`}</strong>
               <span className="muted">
-                {sleepOk ? `${r.sleepModule.dba} dBA, within the 50 dBA target.` : `${quietest.dba} dBA, instead of ${r.sleepModule.name} at ${r.sleepModule.dba} dBA (target 50).`}
+                {sleepOk
+                  ? `${r.sleepModule.dba} dBA, within the 50 dBA target.`
+                  : cqFan
+                    ? `Your quarters measure ${r.sleepModule.dba} dBA (target 50). NASA traces crew-quarters noise to their fans on high speed.`
+                    : `${quietest.dba} dBA, instead of ${r.sleepModule.name} at ${r.sleepModule.dba} dBA (target 50).`}
+                {cqFan && !sleepOk && <Info>NASA's 2024 ISS acoustics report (Allen, ICES-2024-354) notes crew-quarters fans running on high speed.</Info>}
               </span>
-              {!sleepOk && <button className="secondary" onClick={() => set({ sleepAt: quietest.id })}>Switch to {quietest.name}</button>}
+              {!sleepOk && quietest.id !== r.sleepModule.id && <button className="secondary" onClick={() => set({ sleepAt: quietest.id })}>{cqFan ? `Or sleep in ${shortName(quietest.name)} (${quietest.dba} dBA)` : `Switch to ${quietest.name}`}</button>}
             </div>
           </li>
           <li>
@@ -119,11 +157,14 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
             </div>
           </li>
           <li>
-            <span className={`rec-icon${exposure ? ' todo' : ''}`} aria-hidden="true">{exposure ? '!' : '○'}</span>
+            <span className={`rec-icon${nextCheck.urgent ? ' todo' : ''}`} aria-hidden="true">{nextCheck.urgent ? '!' : '○'}</span>
             <div>
-              <strong>{exposure ? 'Hearing check tonight' : 'Next hearing check: when Earshot asks'}</strong>
-              <span className="muted">{exposure ? exposure.body : 'After a loud exposure, Earshot asks for a 2-minute check at the pitches that noise reaches.'}</span>
-              {exposure && <button className="secondary" onClick={() => go(exposure.actions[0].to)}>Quick check</button>}
+              <strong>{nextCheck.title}</strong>
+              <span className="muted">
+                {nextCheck.body}
+                <Info>Earshot's check schedule adapts to your ears: tonight after a loud exposure, tomorrow after a change that may be temporary, in 3 days while a pitch is on watch, otherwise monthly. NASA requires one in-flight test per ISS mission (Wexler et al. 2026); these intervals are Earshot's design choice.</Info>
+              </span>
+              {nextCheck.to && <button className="secondary" onClick={() => go(nextCheck.to)}>{nextCheck.label}</button>}
             </div>
           </li>
           {hs.state === 'high' && (
@@ -156,14 +197,14 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
           <Info>The day comes from the crew schedule (simulated; Earshot assumes it is up to date). Change it here to try a different day.</Info>
         </p>
         <div className="day-rows">
-          {r.day.map((seg) => {
+          {items.filter((x) => x.id !== 'sleep').map((seg) => {
             const placeIndex = seg.kind === 'place' && seg.id !== 'fill' ? Number(seg.id.replace('place', '')) : null;
             const edit = seg.kind === 'activity' ? { type: 'activity', id: seg.id } : seg.id === 'fill' ? { type: 'fill' } : { type: 'place', index: placeIndex };
             return (
               <button key={seg.id} className="day-row" onClick={() => setEditing(edit)}>
                 <i style={{ background: noiseColor(seg.rawDba) }} aria-hidden="true" />
                 <span className="day-name">{seg.id === 'fill' ? `The rest: ${shortName(seg.name)}` : seg.kind === 'activity' ? (seg.id === 't2' ? 'T2 treadmill' : 'ARED exercise') : shortName(seg.name)}</span>
-                <span className="day-meta">{hm(seg.minutes)} · {seg.rawDba} dBA</span>
+                <span className="day-meta">{times[seg.id] ? `${times[seg.id]} · ` : ''}{hm(seg.minutes)} · {seg.rawDba} dBA</span>
                 {seg.protectedNow && <span className="day-tag">Earplugs</span>}
                 <span className="chev" aria-hidden="true">›</span>
               </button>
@@ -180,7 +221,7 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
           <button className="day-row" onClick={() => setEditing({ type: 'sleep' })}>
             <i style={{ background: noiseColor(r.sleepModule.dba) }} aria-hidden="true" />
             <span className="day-name">Sleep: {shortName(r.sleepModule.name)}</span>
-            <span className="day-meta">8 h · {r.sleepModule.dba} dBA</span>
+            <span className="day-meta">{times.sleep ? `${times.sleep} · ` : ''}8 h · {r.sleepModule.dba} dBA</span>
             <span className="chev" aria-hidden="true">›</span>
           </button>
           <button className="day-row add" onClick={() => setEditing({ type: 'add' })}>

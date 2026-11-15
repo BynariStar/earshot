@@ -155,3 +155,28 @@ export function applyFlags(plan, protectAbove) {
   const flagged = computePlan({ ...p, protect }).day.filter((s) => s.protectedNow).map((s) => ({ id: s.id, name: s.name.replace(' (earplugs)', ''), dba: s.rawDba }));
   return { plan: { ...p, protect }, flagged };
 }
+
+// The simulated crew schedule as clock times: the workday runs 06:30-22:30, then 8 h of sleep. Order: the
+// general area first, then the quietest named place, the loudest, the treadmill, the other places, ARED.
+export const DAY_START = 6 * 60 + 30;
+export function timeline(result) {
+  const segs = result.day;
+  const fill = segs.find((s) => s.id === 'fill');
+  const places = segs.filter((s) => s.kind === 'place' && s.id !== 'fill').sort((a, b) => a.rawDba - b.rawDba);
+  const t2 = segs.find((s) => s.id === 't2');
+  const ared = segs.find((s) => s.id === 'ared');
+  const order = [fill, places[0], places[places.length - 1], t2, ...places.slice(1, -1), ared].filter((s, i, a) => s && a.indexOf(s) === i);
+  let t = DAY_START;
+  const items = order.map((s) => {
+    const item = { ...s, start: t, end: t + s.minutes };
+    t += s.minutes;
+    return item;
+  });
+  items.push({ id: 'sleep', kind: 'sleep', name: result.sleepModule.name, rawDba: result.sleepModule.dba, dba: result.sleepModule.dba, start: t, end: t + 480, minutes: 480 });
+  return items;
+}
+export const clockOf = (m) => `${String(Math.floor((m % 1440) / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+// The next scheduled item that needs earplugs, starting after `nowMin` (minutes since midnight).
+export function nextFlagged(items, nowMin) {
+  return items.find((s) => s.protectedNow && s.start > nowMin) ?? null;
+}

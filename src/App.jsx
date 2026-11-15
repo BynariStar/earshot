@@ -18,7 +18,7 @@ import TestsMenu from './components/TestsMenu.jsx';
 import TabBar from './components/TabBar.jsx';
 import AlertsSheet from './components/AlertsSheet.jsx';
 import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
-import { loadPlan, savePlan, computePlan, applyFlags, normalize, scheduleFor } from './lib/plan.js';
+import { loadPlan, savePlan, computePlan, applyFlags, normalize, scheduleFor, timeline } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
 import { personaById, customPersona, simulatedThresholds } from './lib/personas.js';
 import { hearingState, TARGETS } from './lib/personal.js';
@@ -107,6 +107,12 @@ export default function App() {
     return scheduleFor(session.station);
   }, [plan, session]);
 
+  // The clock, in minutes since midnight, refreshed every 30 s (for "earplugs ahead").
+  const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  useEffect(() => {
+    const id = setInterval(() => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()); }, 30000);
+    return () => clearInterval(id);
+  }, []);
   const hearing = hearingState(data);
   const flags = applyFlags(effectivePlan, TARGETS[hearing.state].protectAbove);
   const planResult = computePlan(flags.plan);
@@ -148,7 +154,7 @@ export default function App() {
   const markSeen = (keys) => changeSession((prev) => ({ ...prev, bellSeen: [...new Set([...(prev.bellSeen ?? []), ...keys])] }));
   const markDone = (key) => changeSession((prev) => ({ ...prev, done: [...new Set([...(prev.done ?? []), key])] }));
   const alerts = session
-    ? buildAlerts({ station: session.station, data, events: session.events ?? [], plan: planResult, planFlags: flags.flagged, hearing, quick: data.quick ?? [] })
+    ? buildAlerts({ station: session.station, data, events: session.events ?? [], plan: planResult, quick: data.quick ?? [], schedule: timeline(planResult), nowMin })
     : [];
 
   // A new popup alert opens full screen once (not during a test, and not on the page it points to).
@@ -316,7 +322,7 @@ export default function App() {
 
       <main>
         {earsTab === 'overview' && (
-          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} earplugs={flags.flagged.map((f) => f.name)} go={go} onReport={reportSymptom} />
+          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} earplugs={flags.flagged.map((f) => f.name)} go={go} onReport={reportSymptom} onSimulatedFullCheck={simulatedFullCheck} />
         )}
         {earsTab === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={startTest} />}
         {earsTab === 'sudden' && <SuddenResponse data={data} onRetest={() => go('quick/ringing')} />}

@@ -26,7 +26,7 @@ const RANK = { urgent: 4, shift: 3, watch: 2 };
 const hz = (f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
-export default function Home({ data, onStartTest, onOpenSudden, simulated, earplugs = [], go, onReport }) {
+export default function Home({ data, onStartTest, onOpenSudden, simulated, earplugs = [], go, onReport, onSimulatedFullCheck }) {
   const [reporting, setReporting] = useState(null); // null | 'symptom' | { symptom }
   const [picked, setPicked] = useState(null);
   const baselines = baselineTests(data);
@@ -61,7 +61,9 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
   const firstSentence = (t) => t.split(/(?<=\.)\s/)[0];
 
   // The verdict: one sentence, one action.
-  let title, sub, more = null, todo = [], cta = null;
+  let title, sub, more = null, todo = [], cta = null, quickCta = false;
+  const lastQuick = (data.quick ?? [])[0];
+  const quickNewer = !!lastQuick && lastQuick.worst >= 10 && (!check || Number.isFinite(check.missionDay) || new Date(check.date).getTime() < lastQuick.at);
   if (baselines.length < 2) {
     title = baselines.length ? 'Finish your baseline' : 'Set your baseline';
     sub = baselines.length ? 'One more 8-minute test.' : 'Two 8-minute tests on your own headphones.';
@@ -71,6 +73,19 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
     title = 'Baseline set';
     sub = 'Earshot asks for a check after loud exposures.';
     cta = { label: 'Full check', role: 'check' };
+  } else if (quickNewer) {
+    // A quick check newer than the last full check leads: it's the most recent thing known about these ears.
+    const w = lastQuick.worst;
+    const where = `${cap(lastQuick.worstEar)} ear, ${hz(lastQuick.worstAt)}`;
+    if (w >= 30) {
+      title = 'Quick check: possible sudden drop';
+      sub = `${where}: ${w} dB worse. Confirm it with the full check now.`;
+      todo = ['Tell your crew medical officer now.', 'Run the full check to confirm.'];
+      quickCta = true;
+    } else {
+      title = `Quick check: ${where}, ${w} dB worse`;
+      sub = 'Often temporary after loud noise. Keep tonight quiet; Earshot rechecks tomorrow.';
+    }
   } else if (findings.length) {
     const f = findings.find((x) => x.kind === 'sudden') ?? findings[0];
     const e = explain(f);
@@ -118,7 +133,8 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
             <ul>{todo.map((a) => <li key={a}>{a}</li>)}</ul>
           </div>
         )}
-        {findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
+        {!quickNewer && findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
+        {quickCta && (simulated ? <button className="primary" onClick={() => onSimulatedFullCheck(lastQuick.truth)}>Run the full check (simulated)</button> : <button className="primary" onClick={() => onStartTest('check')}>Full check now</button>)}
         {earplugs.length > 0 && (findings.length ? findings.some((f) => f.kind === 'high') : !!worst && worst.frequency >= 2000) && (
           <p>
             Earshot has added earplugs to today: {earplugs.map((n) => n.replace(/^.*\((.*)\)$/, '$1')).join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See today</button>

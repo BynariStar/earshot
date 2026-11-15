@@ -28,7 +28,7 @@ const listJoin = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(
 
 // Every alert is listed behind the bell. Only `popup` alerts also open full screen (once): a confirmed sudden
 // drop, and noise where you are (wear earplugs, see the source). Requests for a hearing check never pop up.
-export function buildAlerts({ station, data, events, plan, quick }) {
+export function buildAlerts({ station, data, events, plan, quick, schedule = [], nowMin = null }) {
   const st = STATIONS[station];
   const out = [];
   const check = latestCheck(data);
@@ -96,6 +96,15 @@ export function buildAlerts({ station, data, events, plan, quick }) {
     else out.push({ id: 'q0', level: 'info', dismissable: true, title: 'Quick check: no change', body: `Every pitch within ${lastQuick.worst} dB of your baseline.`, actions: [] });
   }
 
+  // Earplugs ahead: 15 minutes before a scheduled item that needs them (a proactive "wear earplugs" popup).
+  if (nowMin !== null) {
+    const next = schedule.find((s) => s.protectedNow && s.start > nowMin && s.start - nowMin <= 15);
+    if (next) {
+      const name = next.name.replace(' (earplugs)', '').replace(/^.*\((.*)\)$/, '$1');
+      const hhmm = `${String(Math.floor(next.start / 60)).padStart(2, '0')}:${String(next.start % 60).padStart(2, '0')}`;
+      out.push({ id: `ahead-${next.id}`, level: 'warn', popup: true, dismissable: true, title: `Earplugs for ${name} at ${hhmm}`, body: `Next on your schedule: ${name}, ${next.rawDba} dBA, for ${next.minutes >= 60 ? `${next.minutes / 60} h` : `${next.minutes} min`}.`, actions: [{ label: 'See today', to: 'plan' }] });
+    }
+  }
   // Earplug flags and stricter targets are recommendations, shown on Today, not alerts.
   if (baselineTests(data).length < 2) out.push({ id: 'baseline', level: 'info', title: 'Set your baseline', body: 'Two 8-minute tests on your own headphones. Every later check compares against them.', actions: [{ label: 'Start', to: 'test/baseline' }] });
 

@@ -35,7 +35,7 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
       if (Number.isFinite(v) && !isNoResponse(ref[ear][f])) changes.push({ ear, f, d: Math.round(v - ref[ear][f]) });
     }
     const worst = changes.reduce((a, c) => (c.d > a.d ? c : a), { d: -99 });
-    const q = { at: Date.now(), kind, pitches, thresholds, changes, worst: worst.d, worstAt: worst.f, worstEar: worst.ear, simulated };
+    const q = { at: Date.now(), kind, pitches, thresholds, changes, worst: worst.d, worstAt: worst.f, worstEar: worst.ear, simulated, truth: simulated ? truthRef.current : undefined };
     onSave(q);
     setResult(q);
     setStage('result');

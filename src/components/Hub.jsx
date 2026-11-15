@@ -105,6 +105,16 @@ export default function Hub({ data, plan, go, onStartTest, onLoadDemo, onExitDem
             {day.top ? `; ${day.top.name} uses the most (${Math.round(day.top.dosePct)}%).` : '.'}
           </p>
         </article>
+        <article className="hub-card" onClick={() => go('fleet')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && go('fleet')}>
+          <div className="hub-card-head">
+            <h2>Fleet trends</h2>
+            <span className="badge sim">Simulated</span>
+          </div>
+          <p>
+            What the ground learns when crews pool their end-of-day noise logs (never hearing results): what pushes days over the limit, which
+            module is getting louder, which sleep stations miss the target.
+          </p>
+        </article>
       </div>
 
       <details className="hub-about">

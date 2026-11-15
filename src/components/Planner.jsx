@@ -4,7 +4,9 @@
 // NASA's 24-hour noise allowance (NASA-STD-3001 [V2 6115]); the rest of the 16-hour workday is one
 // background choice that fills the remaining time automatically, so the day always adds up to 16 + 8 h.
 import { ACTIVITIES, BACKGROUNDS, SLEEP_MODULES, MAX_ACTIVITY_MIN, WORKDAY_MIN, computePlan, setActivity } from '../lib/plan.js';
+import { useState } from 'react';
 import { noiseColor } from '../lib/issLayout.js';
+import { LOUD_EVENTS, loadLogs, saveLogs, shareable } from '../lib/daylog.js';
 
 const STATUS = {
   ok: { text: 'Under 60 dBA: no protection needed', cls: 'ok' },
@@ -127,10 +129,87 @@ export default function Planner({ plan, setPlan }) {
           </p>
         </div>
       </div>
+      <DayLog plan={plan} />
       <p className="muted">
         Sources: activity levels and earplug effect from NASA's noise-exposure worked example (Allen &amp; Danielson 2020); module levels from
         Allen 2024; limits from Flight Rule B13-152 and NASA-STD-3001 [V2 6115].
       </p>
+    </section>
+  );
+}
+
+// End of the day: what actually happened. Starts from the plan; one tap to log.
+function DayLog({ plan }) {
+  const [logs, setLogs] = useState(loadLogs);
+  const [entry, setEntry] = useState(() => ({ activities: { ...plan.activities }, earplugs: plan.earplugs, background: plan.background, sleepAt: plan.sleepAt, events: [] }));
+  const [copied, setCopied] = useState(false);
+  const r = computePlan(entry);
+  const update = (patch) => setEntry((e) => ({ ...e, ...patch }));
+  const log = () => {
+    const next = [{ ...entry, id: crypto.randomUUID(), date: new Date().toISOString(), dosePct: r.dosePct, leqDba: r.work.leqDba }, ...logs].slice(0, 60);
+    setLogs(next);
+    saveLogs(next);
+  };
+  const remove = (id) => {
+    const next = logs.filter((l) => l.id !== id);
+    setLogs(next);
+    saveLogs(next);
+  };
+  return (
+    <section className="daylog">
+      <h3>How did today actually go?</h3>
+      <p className="muted">Plans are intentions; logs are what crews can learn from. Starts from your plan: change what was different, then log it. Noise only, stored on this device.</p>
+      <div className="daylog-grid">
+        <div>
+          {ACTIVITIES.map((a) => (
+            <label key={a.id} className="slider">
+              <span>{a.id === 't2' ? 'T2 treadmill' : 'ARED'}</span>
+              <input type="range" min="0" max={MAX_ACTIVITY_MIN} step="15" value={entry.activities[a.id] ?? 0} onChange={(e) => setEntry(setActivity(entry, a.id, Number(e.target.value)))} />
+              <span className="val">{entry.activities[a.id] ?? 0} min</span>
+            </label>
+          ))}
+          <label className="inline sub">
+            <input type="checkbox" checked={entry.earplugs} onChange={(e) => update({ earplugs: e.target.checked })} /> I wore earplugs on the treadmill
+          </label>
+          <label className="select">
+            Mostly in
+            <select value={entry.background} onChange={(e) => update({ background: e.target.value })}>
+              {BACKGROUNDS.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <div>
+          <p className="small">Anything loud that the plan didn't have?</p>
+          <div className="chips">
+            {LOUD_EVENTS.map((ev) => (
+              <label key={ev} className={`chip${entry.events.includes(ev) ? ' on' : ''}`}>
+                <input type="checkbox" checked={entry.events.includes(ev)} onChange={(e) => update({ events: e.target.checked ? [...entry.events, ev] : entry.events.filter((x) => x !== ev) })} />
+                {ev}
+              </label>
+            ))}
+          </div>
+          <p className="small">Logged day: <strong>{Math.round(r.dosePct)}%</strong> of the allowance, workday {r.work.leqDba.toFixed(1)} dBA (events are noted, not added to the numbers).</p>
+          <button className="primary" onClick={log}>Log today</button>
+        </div>
+      </div>
+      {logs.length > 0 && (
+        <>
+          <ul className="daylog-list">
+            {logs.slice(0, 7).map((l) => (
+              <li key={l.id}>
+                <span>{new Date(l.date).toLocaleDateString()}</span>
+                <strong className={l.dosePct > 100 ? 'over' : ''}>{Math.round(l.dosePct)}%</strong>
+                <span className="muted">{l.activities.t2 ? `treadmill ${l.activities.t2} min${l.earplugs ? ' with earplugs' : ''}` : 'no treadmill'}{l.events.length ? ` · ${l.events.length} loud event${l.events.length > 1 ? 's' : ''}` : ''}</span>
+                <button className="link-button" onClick={() => remove(l.id)} aria-label="Delete this log">Delete</button>
+              </li>
+            ))}
+          </ul>
+          <button className="secondary" onClick={async () => { try { await navigator.clipboard.writeText(JSON.stringify(shareable(logs), null, 1)); setCopied(true); } catch { setCopied(false); } }}>
+            {copied ? 'Copied' : 'Copy my noise logs to share with the ground'}
+          </button>
+          <p className="muted small">Shares noise logs only, never hearing results. Nothing is sent automatically.</p>
+        </>
+      )}
     </section>
   );
 }

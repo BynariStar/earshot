@@ -242,3 +242,14 @@ describe('simulated bases', () => {
     expect(marsSleep).toBeCloseTo(SPEC_SLEEP_DBA, 6);
   });
 });
+
+import { simulateFleet, analyzeFleet, ANOMALY } from './fleet.js';
+describe('simulated fleet view', () => {
+  const a = analyzeFleet(simulateFleet());
+  it('finds exactly the injected loud-module weeks, with no false alarms', () => {
+    expect(a.anomalies.map((x) => [x.exp, x.module, x.week])).toEqual(ANOMALY.weeks.map((w) => [ANOMALY.expedition, ANOMALY.module, w]));
+  });
+  it('is deterministic, so the pitch numbers never change', () => {
+    expect(analyzeFleet(simulateFleet()).over).toBe(a.over);
+  });
+});

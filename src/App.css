@@ -314,3 +314,33 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 @media (max-width: 900px) { .sudden-grid { grid-template-columns: 1fr; } }
 .base-controls { align-items: center; }
 .base-controls .select { display: inline-flex; align-items: center; gap: 8px; }
+.daylog { margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
+.daylog h3 { margin: 0 0 4px; }
+.daylog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
+.daylog-list { list-style: none; padding: 0; margin: 12px 0; }
+.daylog-list li { display: flex; gap: 12px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+@media (max-width: 900px) { .daylog-grid { grid-template-columns: 1fr; } }
+.ears-card { grid-row: span 3; }
+.fleet { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.stat-value { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-label { color: var(--text); }
+.fleet-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
+.fleet-card h3 { margin: 0 0 6px; }
+.fleet-card summary { cursor: pointer; color: var(--muted); }
+.fleet-card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fleet-chart { width: 100%; height: auto; }
+.fleet-chart .threshold { stroke: var(--muted); stroke-dasharray: 5 4; }
+.fleet-chart .axis-line { stroke: var(--border); stroke-width: 1.5; }
+.fleet-chart .series-label { fill: var(--text); font-size: 12px; font-weight: 600; }
+.hbars { display: flex; flex-direction: column; gap: 6px; }
+.hbar { display: grid; grid-template-columns: minmax(180px, 260px) 1fr 48px; align-items: center; gap: 10px; }
+.hbar-label { font-size: 0.9rem; }
+.hbar-label em { color: var(--muted); font-style: normal; font-size: 0.8rem; }
+.hbar-track { height: 12px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.hbar-fill { display: block; height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.hbar-value { font-variant-numeric: tabular-nums; text-align: right; }
+.fixes ol { padding-left: 20px; margin: 4px 0; }
+.fixes li { margin: 6px 0; }
+@media (max-width: 900px) { .stats { grid-template-columns: 1fr; } .hbar { grid-template-columns: 1fr 1fr 44px; } }

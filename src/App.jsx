@@ -10,6 +10,7 @@ import Planner from './components/Planner.jsx';
 import IsThisNormal from './components/IsThisNormal.jsx';
 import Tests from './components/Tests.jsx';
 import SuddenResponse from './components/SuddenResponse.jsx';
+import Fleet from './components/Fleet.jsx';
 import { load, save, clearAll, withoutTest, latestCheck } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan } from './lib/plan.js';
 import { demoState } from './lib/demo.js';
@@ -36,7 +37,7 @@ function useRoute() {
   return [route, go];
 }
 
-const TITLES = { ears: 'My ears', station: 'Station noise', plan: 'Plan a workday', test: 'Hearing test' };
+const TITLES = { ears: 'My ears', station: 'Station noise', plan: 'Plan a workday', fleet: 'Fleet trends', test: 'Hearing test' };
 
 export default function App() {
   const [data, setData] = useState(load);
@@ -107,6 +108,7 @@ export default function App() {
         </button>
         <h1>{TITLES[section]}</h1>
         {section === 'ears' && <span className="badge personal">Personal</span>}
+        {section === 'fleet' && <span className="badge sim">Simulated</span>}
       </header>
 
       {section === 'ears' && (
@@ -133,6 +135,7 @@ export default function App() {
           </Suspense>
         )}
         {section === 'plan' && <Planner plan={plan} setPlan={setPlan} />}
+        {section === 'fleet' && <Fleet />}
       </main>
       <Footer />
     </div>

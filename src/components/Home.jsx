@@ -118,7 +118,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
         {findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
         {earplugs.length > 0 && (findings.length ? findings.some((f) => f.kind === 'high') : !!worst && worst.frequency >= 2000) && (
           <p>
-            Earshot has added earplugs to your plan: {earplugs.join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See my plan</button>
+            Earshot has added earplugs to today: {earplugs.join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See today</button>
           </p>
         )}
         {cogLine && (

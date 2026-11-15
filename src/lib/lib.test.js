@@ -296,7 +296,7 @@ describe('active monitoring', () => {
     const data = p.state();
     const events = [{ type: 'fan-fault', at: 1 }];
     const alerts = buildAlerts({ station: 'iss', data, events, plan: { placesUsed: ['node2'] }, planFlags: [], hearing: { state: 'high' }, quick: [] });
-    expect(alerts.map((a) => a.id)).toEqual(expect.arrayContaining(['fault', 'exposure', 'targets']));
+    expect(alerts.map((a) => a.id)).toEqual(expect.arrayContaining(['fault', 'exposure']));
     expect(quickPitchesFor(events[0])).toEqual([500, 1000, 4000]);
   });
   it('ringing on crew member D leads to a 30+ dB simulated drop', () => {

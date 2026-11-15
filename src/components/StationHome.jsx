@@ -14,9 +14,9 @@ const DEMO_EVENTS = [
   { type: 'ringing', label: 'Ringing in the right ear', ear: 'right' },
 ];
 
-export default function StationHome({ session, persona, go, focus, onEvent, onClearEvents, onChange, liveStart, pausedAt, onTogglePause, onMoveMe }) {
+export default function StationHome({ session, persona, focus, onEvent, onClearEvents, onChange, liveStart, pausedAt, onTogglePause, onMoveMe }) {
   const st = STATIONS[session.station];
-  const [sheet, setSheet] = useState(null); // 'demo' | 'menu' | 'move'
+  const [sheet, setSheet] = useState(null); // 'demo' | 'move'
   // P pauses or plays the simulated feed (for presenting).
   useEffect(() => {
     const onKey = (e) => {
@@ -42,7 +42,6 @@ export default function StationHome({ session, persona, go, focus, onEvent, onCl
             <span className="wide-only">Demo controls</span>
             <span className="narrow-only">Demo</span>
           </button>
-          <button className="secondary head-btn icon-only" onClick={() => setSheet('menu')} aria-label="Menu">⋯</button>
         </div>
       </header>
 
@@ -68,6 +67,9 @@ export default function StationHome({ session, persona, go, focus, onEvent, onCl
             <button className="row" onClick={() => { close(); onClearEvents(); }}>
               <span>Start over</span>
             </button>
+            <button className="row" onClick={() => { close(); onChange(); }}>
+              <span>Change station or crew member</span><span aria-hidden="true">›</span>
+            </button>
           </div>
         </Sheet>
       )}
@@ -82,15 +84,6 @@ export default function StationHome({ session, persona, go, focus, onEvent, onCl
                 <span>{p.label}</span>{session.youAt === p.id && <span aria-hidden="true">✓</span>}
               </button>
             ))}
-          </div>
-        </Sheet>
-      )}
-      {sheet === 'menu' && (
-        <Sheet title="Menu" onClose={close}>
-          <div className="rows">
-            <button className="row" onClick={() => { close(); go('station'); }}><span>Explore the data</span><span aria-hidden="true">›</span></button>
-            <button className="row" onClick={() => { close(); go('about'); }}><span>Sources and disclosures</span><span aria-hidden="true">›</span></button>
-            <button className="row" onClick={() => { close(); onChange(); }}><span>Change station or crew member</span><span aria-hidden="true">›</span></button>
           </div>
         </Sheet>
       )}

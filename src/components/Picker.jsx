@@ -4,8 +4,8 @@
 import { useState } from 'react';
 import Sheet from './Sheet.jsx';
 
-export default function Picker({ label, value, options, onChange, className = '' }) {
-  const [open, setOpen] = useState(false);
+export default function Picker({ label, value, options, onChange, className = '', startOpen = false }) {
+  const [open, setOpen] = useState(startOpen);
   const current = options.find((o) => o.value === value);
   return (
     <>

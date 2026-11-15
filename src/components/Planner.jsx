@@ -28,14 +28,14 @@ function DayBar({ result }) {
     <div className="daybar" aria-label="Your 16-hour workday">
       {result.day.map((s) => (
         <span key={s.id} style={{ flex: s.minutes, background: noiseColor(s.dba) }} title={`${s.name}: ${hm(s.minutes)} at ${s.dba.toFixed(1)} dBA`}>
-          {s.minutes >= 75 ? SHORT[s.id] ?? s.name.replace(/^Level \d · /, '').replace(' (earplugs)', '') : ''}
+          {s.minutes >= 90 ? SHORT[s.id] ?? s.name.replace(/^Level \d · /, '').replace(' (earplugs)', '').replace(/^.*\((.*)\)$/, '$1') : ''}
         </span>
       ))}
     </div>
   );
 }
 
-export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
+export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focus, alerts = [], events = [], go }) {
   const plan = normalize(rawPlan);
   const target = TARGETS[hearingState(data).state];
   const { plan: flaggedPlan, flagged } = applyFlags(plan, target.protectAbove);
@@ -47,6 +47,13 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
   const set = (patch) => setPlan({ ...plan, ...patch });
   const switchBase = (b) => setPlan({ ...plan, base: b, places: [], fill: DEFAULT_FILL[b], sleepAt: DEFAULT_SLEEP[b] });
   const pct = Math.round(r.dosePct);
+  const hs = hearingState(data);
+  // Earplugs: flagged activities and modules, plus a module with a live fault right now.
+  const live = events.find((e) => e.type === 'live');
+  const earplugs = [...flagged.map((f) => SHORT[f.id] ?? f.name.replace(/^.*\((.*)\)$/, '$1'))];
+  if (live && !flagged.some((f) => f.id === live.part)) earplugs.push(`${live.where.replace(/^.*\((.*)\)$/, '$1')} until it's fixed`);
+  const exposure = alerts.find((a) => a.id === 'exposure');
+  const sleepOk = r.sleepModule.dba <= 50;
   const quietest = [...sleeps].sort((a, b) => a.dba - b.dba)[0];
   const checks = [
     { ok: r.dosePct <= target.dosePct, text: `Noise allowance: ${pct}%`, note: target.dosePct < 100 ? `your target is ${target.dosePct}% while your ears change` : 'NASA limit 100%' },
@@ -72,12 +79,61 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
       )}
 
       <div className="plan-answer">
-        <h2>{flagged.length ? `Wear earplugs for ${listJoin(flagged.map((f) => SHORT[f.id] ?? f.name))}.` : 'No earplugs needed today.'}</h2>
-        <p className="lede">
-          {flagged.length
-            ? `With them, today uses ${pct}% of your noise allowance. Without them, ${Math.round(skip.dosePct)}%.`
-            : `Today uses ${pct}% of your noise allowance.`}
-        </p>
+        <h2>Your recommendations</h2>
+        <ul className="recs">
+          <li>
+            <span className={`rec-icon${earplugs.length ? ' todo' : ''}`} aria-hidden="true">{earplugs.length ? '!' : '✓'}</span>
+            <div>
+              <strong>{earplugs.length ? `Earplugs for ${listJoin(earplugs)}` : 'No earplugs needed today'}</strong>
+              <span className="muted">
+                {earplugs.length ? `With them, today uses ${pct}% of your noise allowance; without them, ${Math.round(skip.dosePct)}%.` : `Today uses ${pct}% of your noise allowance.`}
+                <Info>
+                  Earshot flags anything above {target.protectAbove} dBA{target.protectAbove < 72 ? ' (lowered from 72 dBA because your ears changed)' : ' (Flight Rule B13-152 requires protection above 72 dBA)'}, and any module with a live fault. Earplugs
+                  count as {PLUG_DB.toFixed(1)} dB, from NASA's treadmill figure.
+                </Info>
+              </span>
+            </div>
+          </li>
+          <li>
+            <span className={`rec-icon${sleepOk ? '' : ' todo'}`} aria-hidden="true">{sleepOk ? '✓' : '!'}</span>
+            <div>
+              <strong>{sleepOk ? `Sleep in ${r.sleepModule.name}` : `Sleep in ${quietest.name}`}</strong>
+              <span className="muted">
+                {sleepOk ? `${r.sleepModule.dba} dBA, within the 50 dBA target.` : `${quietest.dba} dBA, instead of ${r.sleepModule.name} at ${r.sleepModule.dba} dBA (target 50).`}
+              </span>
+              {!sleepOk && <button className="secondary" onClick={() => set({ sleepAt: quietest.id })}>Switch to {quietest.name}</button>}
+            </div>
+          </li>
+          <li>
+            <span className="rec-icon" aria-hidden="true">♪</span>
+            <div>
+              <strong>{r.dosePct < 100 ? `Earphones: up to ${hm(r.headroom(85))} at 85 dBA` : 'No loud earphones today'}</strong>
+              <span className="muted">{r.dosePct < 100 ? 'What is left of today\'s allowance. Every 3 dB quieter doubles it.' : 'Today already uses the full allowance.'}</span>
+            </div>
+          </li>
+          <li>
+            <span className={`rec-icon${exposure ? ' todo' : ''}`} aria-hidden="true">{exposure ? '!' : '○'}</span>
+            <div>
+              <strong>{exposure ? 'Hearing check tonight' : 'Next hearing check: when Earshot asks'}</strong>
+              <span className="muted">{exposure ? exposure.body : 'After a loud exposure, Earshot asks for a 2-minute check at the pitches that noise reaches.'}</span>
+              {exposure && <button className="secondary" onClick={() => go(exposure.actions[0].to)}>Quick check</button>}
+            </div>
+          </li>
+          {hs.state === 'high' && (
+            <li>
+              <span className="rec-icon todo" aria-hidden="true">▲</span>
+              <div>
+                <strong>Stricter targets are on</strong>
+                <span className="muted">
+                  Earplugs above 60 dBA and half the daily allowance, until your high pitches settle.
+                  <Info>{target.note ?? 'An Earshot design choice for the flight rule\'s "individual needs" band (60 to 72 dBA), not a NASA number.'}</Info>
+                </span>
+              </div>
+            </li>
+          )}
+        </ul>
+
+        <h3 className="plan-sub">Your day</h3>
         <ul className="plan-checks">
           {checks.map((c) => (
             <li key={c.text} className={c.ok ? 'ok' : 'todo'}>
@@ -89,14 +145,11 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
         <DayBar result={r} />
         <p className="muted small">
           From your crew schedule
-          <Info>
-            The day comes from the crew schedule (simulated; Earshot assumes it is up to date). Earshot flags earplugs for anything above {target.protectAbove} dBA
-            {target.protectAbove < 72 ? ', lowered from 72 dBA because your ears changed' : ''}. Earplugs count as {PLUG_DB.toFixed(1)} dB, from NASA's treadmill figure.
-          </Info>
+          <Info>The day comes from the crew schedule (simulated; Earshot assumes it is up to date). Change it below to try a different day.</Info>
         </p>
       </div>
 
-      <details className="plan-section">
+      <details className="plan-section" open={focus === 'sleep' || undefined}>
         <summary>Change the day</summary>
         <div className="planner-inputs">
           <h4>Loud activities</h4>
@@ -148,6 +201,7 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase }) {
           )}
           <h4>Sleep (8 h)</h4>
           <Picker
+            startOpen={focus === 'sleep'}
             label="Sleep in"
             value={plan.sleepAt}
             options={sleeps.map((m) => ({ value: m.id, label: m.name, note: `${m.dba} dBA` }))}

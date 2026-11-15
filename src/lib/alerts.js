@@ -27,7 +27,7 @@ const listJoin = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(
 
 // Every alert is listed behind the bell. Only `popup` alerts also open full screen (once): a confirmed sudden
 // drop, and noise where you are (wear earplugs, see the source). Requests for a hearing check never pop up.
-export function buildAlerts({ station, data, events, plan, planFlags, hearing, quick }) {
+export function buildAlerts({ station, data, events, plan, quick }) {
   const st = STATIONS[station];
   const out = [];
   const check = latestCheck(data);
@@ -95,10 +95,7 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
     else out.push({ id: 'q0', level: 'info', dismissable: true, title: 'Quick check: no change', body: `Every pitch within ${lastQuick.worst} dB of your baseline.`, actions: [] });
   }
 
-  if (planFlags?.length) {
-    out.push({ id: 'flags', level: 'info', dismissable: true, title: `Earplugs today: ${listJoin(planFlags.map((f) => f.name))}`, body: hearing && hearing.state !== 'none' && hearing.state !== 'steady' ? "From NASA's noise limits and your last hearing check." : "From NASA's noise limits.", actions: [{ label: 'Plan my day', to: 'plan' }] });
-  }
-  if (hearing?.state === 'high') out.push({ id: 'targets', level: 'info', dismissable: true, title: 'Stricter noise targets', body: 'Your last check shows a small change at high pitches.', actions: [{ label: 'See my ears', to: 'ears' }] });
+  // Earplug flags and stricter targets are recommendations, shown on Today, not alerts.
   if (baselineTests(data).length < 2) out.push({ id: 'baseline', level: 'info', title: 'Set your baseline', body: 'Two 8-minute tests on your own headphones. Every later check compares against them.', actions: [{ label: 'Start', to: 'test/baseline' }] });
 
   const order = { urgent: 0, warn: 1, info: 2, ok: 3 };

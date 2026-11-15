@@ -32,6 +32,13 @@ function baseOptions(baseId) {
   };
 }
 export const DEFAULT_FILL = { iss: 'us_general', moon: 'm_work', mars: 'r_work' };
+// The simulated crew schedule's named modules (the rest of the workday is spent in the fill area).
+export const DEFAULT_PLACES = {
+  iss: [{ id: 'mlm', minutes: 120 }, { id: 'sm', minutes: 120 }, { id: 'lab', minutes: 180 }],
+  moon: [{ id: 'm_workshop', minutes: 180 }, { id: 'm_water', minutes: 120 }, { id: 'm_galley', minutes: 60 }],
+  mars: [{ id: 'r_farm', minutes: 120 }, { id: 'r_medical', minutes: 120 }, { id: 'r_galley', minutes: 60 }],
+};
+export const scheduleFor = (base) => ({ base, activities: { t2: 60, ared: 90 }, protect: { t2: false, ared: false, loudPlaces: false }, places: DEFAULT_PLACES[base], fill: DEFAULT_FILL[base], audio: { minutes: 0, dba: 75 }, sleepAt: DEFAULT_SLEEP[base] });
 export const DEFAULT_SLEEP = { iss: 'cq_stbd', moon: 'm_crew', mars: 'r_cq1' };
 export function placeOptions(baseId = 'iss') {
   return baseId === 'iss' ? BACKGROUNDS : baseOptions(baseId).places;
@@ -44,7 +51,7 @@ export const DEFAULT_PLAN = {
   base: 'iss',
   activities: { t2: 60, ared: 90 },
   protect: { t2: false, ared: false, loudPlaces: false },
-  places: [],
+  places: [{ id: 'mlm', minutes: 120 }, { id: 'sm', minutes: 120 }, { id: 'lab', minutes: 180 }],
   fill: 'us_general',
   audio: { minutes: 0, dba: 75 },
   sleepAt: 'cq_stbd',

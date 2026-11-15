@@ -18,7 +18,7 @@ import TestsMenu from './components/TestsMenu.jsx';
 import TabBar from './components/TabBar.jsx';
 import AlertsSheet from './components/AlertsSheet.jsx';
 import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
-import { loadPlan, savePlan, computePlan, applyFlags, normalize, DEFAULT_FILL, DEFAULT_SLEEP } from './lib/plan.js';
+import { loadPlan, savePlan, computePlan, applyFlags, normalize, scheduleFor } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
 import { personaById, customPersona, simulatedThresholds } from './lib/personas.js';
 import { hearingState, TARGETS } from './lib/personal.js';
@@ -47,7 +47,7 @@ function useRoute() {
   return [route, go];
 }
 
-const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Plan my day', test: 'Hearing test', quick: 'Quick check', about: 'Sources and disclosures' };
+const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Today', test: 'Hearing test', quick: 'Quick check', about: 'Sources and disclosures' };
 const APP_START = Date.now();
 
 const personaFor = (s) => (!s || s.persona === 'own' ? null : s.persona === 'custom' ? customPersona(s.custom) : personaById(s.persona));
@@ -95,7 +95,7 @@ export default function App() {
   const effectivePlan = useMemo(() => {
     const p = normalize(plan);
     if (!session || p.base === session.station) return p;
-    return { ...p, base: session.station, places: [], fill: DEFAULT_FILL[session.station], sleepAt: DEFAULT_SLEEP[session.station] };
+    return scheduleFor(session.station);
   }, [plan, session]);
 
   const hearing = hearingState(data);
@@ -145,7 +145,7 @@ export default function App() {
   // A new popup alert opens full screen once (not during a test, and not on the page it points to).
   const alertKey = (a) => `${a.id}:${a.title}`;
   const seen = session?.seen ?? [];
-  const busy = section === 'test' || section === 'quick' || section === 'welcome' || route === 'ears/sudden';
+  const busy = section === 'test' || section === 'quick' || section === 'welcome' || section === 'about' || section === 'station' || route === 'ears/sudden';
   const pageAlert = busy
     ? null
     : alerts.find((a) => a.popup && !seen.includes(alertKey(a)) && !a.actions.some((x) => x.to && x.to === route));
@@ -172,7 +172,7 @@ export default function App() {
     markSeen(bellList.map(bellKey));
     setAlertsOpen(true);
   };
-  const showTabs = session && section !== 'test' && section !== 'quick';
+  const showTabs = session && section !== 'test' && section !== 'quick' && section !== 'about';
   const chrome = (
     <>
       {showTabs && <TabBar section={section} go={go} onAlerts={openAlerts} badge={unseen.length} badgeLevel={badgeLevel} />}
@@ -192,6 +192,7 @@ export default function App() {
 
   function start(s) {
     setSession({ ...s, seen: [], bellSeen: [], done: [], liveStart: Date.now(), pausedAt: null });
+    setPlan(scheduleFor(s.station)); // each session starts from the crew's (simulated) schedule
     if (s.persona === 'custom') clearSim('custom');
     setData(dataFor(s));
     go('');
@@ -220,10 +221,33 @@ export default function App() {
   }
   const startTest = (role) => go(`test/${role}`);
 
-  if ((!session && section !== 'about') || section === 'welcome') {
+  // Outside the app: Sources and disclosures, and Explore the data. No tabs, no alerts; back returns to the start.
+  if (section === 'about' || section === 'station') {
+    return (
+      <div className="app standalone">
+        <header className="appbar">
+          <button className="back" onClick={() => go('welcome')} aria-label="Back to the start">
+            <span aria-hidden="true">‹</span>
+          </button>
+          <h1>{section === 'about' ? 'Sources and disclosures' : 'Explore the data'}</h1>
+        </header>
+        <main>
+          {section === 'about' ? (
+            <About data={data} onReset={() => setData(dataFor(session))} />
+          ) : (
+            <Suspense fallback={<p className="muted">Loading the station…</p>}>
+              <Station />
+            </Suspense>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  if (!session || section === 'welcome') {
     return (
       <div className="app">
-        <Welcome onStart={start} initial={session} onAbout={() => go('about')} />
+        <Welcome onStart={start} initial={session} onAbout={() => go('about')} onExplore={() => go('station')} />
       </div>
     );
   }
@@ -285,13 +309,7 @@ export default function App() {
         {earsTab === 'normal' && <IsThisNormal data={data} onStartTest={() => startTest('baseline')} />}
         {section === 'test' && <TestFlow key={sub} role={sub === 'baseline' ? 'baseline' : 'check'} data={data} onSave={saveTest} onDone={() => go('ears')} onOpenSudden={() => go('ears/sudden')} />}
         {section === 'quick' && <QuickCheck key={sub} kind={sub || 'general'} data={data} persona={persona} events={session.events ?? []} onSave={saveQuick} onSimulatedFullCheck={simulatedFullCheck} go={go} />}
-        {section === 'station' && (
-          <Suspense fallback={<p className="muted">Loading the station…</p>}>
-            <Station demoEvents={session.events ?? []} liveStart={liveStart} pausedAt={session.pausedAt ?? null} onTogglePause={togglePause} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={(id) => changeSession((prev) => ({ ...prev, youAt: id }))} />
-          </Suspense>
-        )}
-        {section === 'about' && <About data={data} onReset={() => setData(dataFor(session))} />}
-        {section === 'plan' && <Planner plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} />}
+        {section === 'plan' && <Planner key={sub ?? ''} plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} focus={sub} alerts={alerts} events={session.events ?? []} go={go} />}
       </main>
       {chrome}
     </div>

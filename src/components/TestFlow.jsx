@@ -229,14 +229,14 @@ export default function TestFlow({ role, data, onSave, onDone, onOpenSudden }) {
           <li>
             <p>Optional: your age and sex let Earshot compare changes with NASA's astronaut hearing-by-age data. Stored on this device only.</p>
             <label className="inline">Age <input type="number" min="18" max="90" value={age} onChange={(e) => setAge(e.target.value)} style={{ width: 80 }} /></label>
-            <label className="inline">
-              Sex
-              <select value={sex} onChange={(e) => setSex(e.target.value)}>
-                <option value="">Prefer not to say</option>
-                <option value="female">Female</option>
-                <option value="male">Male</option>
-              </select>
-            </label>
+            <div className="field">
+              <span>Sex</span>
+              <div className="segmented wrap">
+                {[['', 'Prefer not to say'], ['female', 'Female'], ['male', 'Male']].map(([v, l]) => (
+                  <button key={v || 'none'} className={sex === v ? 'on' : ''} onClick={() => setSex(v)}>{l}</button>
+                ))}
+              </div>
+            </div>
           </li>
         )}
         {role !== 'baseline' && (

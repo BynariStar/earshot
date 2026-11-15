@@ -16,11 +16,14 @@ import { ISS_PARTS, SLEEP_IN, T2_MODULE, NOISE_BINS, NO_DATA_COLOR, noiseColor }
 import { T2 } from '../lib/plan.js';
 import Spectrum from './Spectrum.jsx';
 import Info from './Info.jsx';
+import Picker from './Picker.jsx';
 import { faultDelta } from '../lib/spectrum.js';
 import { STATIONS } from '../lib/session.js';
 import { liveFrame, jitter, incidentDelta, whereAt, signatureOf } from '../lib/live.js';
 import { BASES, ATMOSPHERES, EXERCISE_SESSIONS, baseLevel, pressureDelta, SPEC_WORK_DBA, SPEC_SLEEP_DBA } from '../lib/bases.js';
 
+// A word for each colour band, so level never depends on colour alone.
+const bandWord = (v) => (!Number.isFinite(v) ? '' : v <= 50 ? 'Quiet' : v <= 60 ? 'Moderate' : v <= 65 ? 'Loud' : 'Very loud');
 const byId = Object.fromEntries(iss.modules.map((m) => [m.id, m]));
 const CHAMBER_PARTS = lmlstp.floors.map((f, i) => ({ id: `floor${i}`, label: f.floor, axis: 'y', pos: [0, i * 3.1, 0], len: 2.9, r: 3.05 }));
 
@@ -119,6 +122,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 700);
   const [hover, setHover] = useState(null);
   const [viewCtl, setViewCtl] = useState(false);
+  const [showKey, setShowKey] = useState(false);
   const view = useRef(null);
   const [wide, setWide] = useState(() => window.innerWidth > 700);
   useEffect(() => {
@@ -206,12 +210,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
       {base && !compact && (
         <div className="station-controls base-controls">
           <Segmented label="Levels" value={basis} onChange={setBasis} options={[['spec', 'Built to NASA limits'], ['iss', 'ISS-like']]} />
-          <label className="select">
-            Cabin air
-            <select value={atm} onChange={(e) => setAtm(e.target.value)}>
-              {Object.entries(ATMOSPHERES).map(([k, a]) => <option key={k} value={k}>{a.label}</option>)}
-            </select>
-          </label>
+          <Picker label="Cabin air" value={atm} options={Object.entries(ATMOSPHERES).map(([k, x]) => ({ value: k, label: x.label }))} onChange={setAtm} />
           {basis === 'iss' && atm !== '14.7' && (
             <Segmented label="Fans" value={fans} onChange={setFans} options={[['same-mass', 'Fans sped up for the same airflow'], ['same-speed', 'Same fans, same speed']]} />
           )}
@@ -265,17 +264,25 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
               )}
             </div>
           )}
-          {!live && mode === 'now' && events.length > 0 && <p className="map-note">{events[0].text}</p>}
-        </div>
-        <div className="map-overlay map-tr">
+          <div className="map-mode">
           <Segmented
             label="View"
             value={mode}
             onChange={(v) => { setMode(v); setPlaying(false); }}
             options={place === 'chamber' ? [['now', 'Day'], ['avg', 'Average']] : [['live', 'Live'], ['now', 'Day'], ['avg', 'Average']]}
           />
+          </div>
+          {!live && mode === 'now' && events.length > 0 && <p className="map-note">{events[0].text}</p>}
         </div>
-        <div className="map-overlay map-br">
+        {showKey && (
+          <div className="map-overlay map-key" aria-label="Colour key">
+            {NOISE_BINS.map((b, i) => (
+              <span key={b.label}><i style={{ background: b.color }} /><strong>{['Quiet', 'Moderate', 'Loud', 'Very loud'][i]}</strong> {b.label.replace(' (sleep target)', '')}</span>
+            ))}
+            {place !== 'chamber' && <span><i style={{ background: NO_DATA_COLOR }} /><strong>No value</strong></span>}
+          </div>
+        )}
+        <div className="map-overlay map-r">
           {viewCtl && (
             <div className="view-ctl" role="group" aria-label="Map view controls">
               <button className="map-icon" onClick={() => view.current?.rotate(-1)} aria-label="Turn left">⟲</button>
@@ -285,6 +292,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
               <button className="map-icon" onClick={() => view.current?.reset()} aria-label="Reset view">⌂</button>
             </div>
           )}
+          <button className={`map-icon key-btn${showKey ? ' on' : ''}`} onClick={() => setShowKey((v) => !v)} aria-pressed={showKey}>Key</button>
           <button className={`map-icon${viewCtl ? ' on' : ''}`} onClick={() => setViewCtl((v) => !v)} aria-pressed={viewCtl} aria-label="Map buttons: turn and zoom">✥</button>
         </div>
         {you && (
@@ -381,13 +389,6 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           </button>
         )}
       </div>
-      <div className="legend-bar" aria-label="Colour key">
-        {NOISE_BINS.map((b) => (
-          <span key={b.label}><i style={{ background: b.color }} />{['Quiet', 'Moderate', 'Loud', 'Very loud'][NOISE_BINS.indexOf(b)]} {b.label.replace(' (sleep target)', '').replace(' dBA', '')}</span>
-        ))}
-        {place !== 'chamber' && <span><i style={{ background: NO_DATA_COLOR }} />No value</span>}
-        <span className="muted">dBA</span>
-      </div>
       {mode === 'now' && (
         <div className="timebar">
           <button className="secondary play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play the day'}>
@@ -451,7 +452,7 @@ function BaseDetail({ part, level, why, atm, basis, fault, live, incident }) {
       <h3>{part.label}</h3>
       <p className="muted">{part.contains}</p>
       {Number.isFinite(level) ? (
-        <p className="level" style={{ color: noiseColor(level) }}>
+        <p className="level" style={{ color: noiseColor(level) }} data-band={bandWord(level)}>
           {level.toFixed(1)} dBA <span className="muted">{live ? 'live (simulated)' : 'simulated'}</span>
         </p>
       ) : (
@@ -484,7 +485,7 @@ function ModuleDetail({ part, level, place, mode, fault, incident }) {
       {part.struct ? (
         <p className="muted">Connecting passage; no separate noise value.</p>
       ) : Number.isFinite(level) ? (
-        <p className="level" style={{ color: noiseColor(level) }}>
+        <p className="level" style={{ color: noiseColor(level) }} data-band={bandWord(level)}>
           {level.toFixed(1)} dBA <span className="muted">{mode === 'live' ? 'live (simulated)' : mode === 'avg' ? (place === 'iss' ? 'measured average' : '24-hour average') : place === 'iss' ? 'simulated, this time of day' : 'this minute'}</span>
         </p>
       ) : (
@@ -494,15 +495,12 @@ function ModuleDetail({ part, level, place, mode, fault, incident }) {
       {m?.date && <p className="muted">NASA survey of {m.date}</p>}
       {place === 'iss' && !part.struct && <Spectrum id={part.id} fault={fault} hideSource={!!incident} />}
       {sleepers.length > 0 && (
-        <>
-          <h4>Sleep stations here</h4>
-          <ul>
-            {sleepers.map((id) => (
-              <li key={id}>{byId[id].name}: <strong style={{ color: noiseColor(byId[id].dba) }}>{byId[id].dba} dBA</strong></li>
-            ))}
-          </ul>
-          <p className="muted">NASA's sleep target is 50 dBA; up to 62 dBA still counts as hearing rest (Flight Rule B13-152).</p>
-        </>
+        <div className="sleep-line">
+          <p className="small">
+            {sleepers.length} crew quarters here, {Math.min(...sleepers.map((id) => byId[id].dba))}–{Math.max(...sleepers.map((id) => byId[id].dba))} dBA.
+          </p>
+          <button className="secondary" onClick={() => { window.location.hash = '#/plan/sleep'; }}>Choose where I sleep ›</button>
+        </div>
       )}
       {place === 'chamber' && (
         <p className="muted">The chart below shows this floor's full day.</p>

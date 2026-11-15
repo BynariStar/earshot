@@ -357,3 +357,16 @@ describe('build your own simulated crew member', () => {
     expect(low.tests[low.tests.length - 1].confirmedFindings.map((f) => `${f.kind}:${f.ear}`)).toContain('low:right');
   });
 });
+
+import { scenarioThresholds, personaById as pById } from './personas.js';
+describe('simulated check scenarios', () => {
+  it('each scenario changes the right pitches on the chosen ear', () => {
+    const b = pById('high');
+    const none = scenarioThresholds(b, [], 'none');
+    const sudden = scenarioThresholds(b, [], 'sudden', 'left');
+    expect(sudden.left[3000] - none.left[3000]).toBe(40);
+    expect(sudden.right[3000]).toBe(none.right[3000]);
+    const low = scenarioThresholds(b, [], 'low', 'right');
+    expect(low.right[250] - none.right[250]).toBe(15);
+  });
+});

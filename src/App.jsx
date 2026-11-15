@@ -216,8 +216,8 @@ export default function App() {
   const deleteTest = (id) => update((d) => withoutTest(d, id));
   const saveQuick = (q) => update((d) => ({ ...d, quick: [q, ...(d.quick ?? [])].slice(0, 30) }));
   // A simulated crew member's full check after a quick check found a large drop (the retest is assumed to repeat it).
-  function simulatedFullCheck() {
-    const truth = simulatedThresholds(persona, session.events ?? []);
+  function simulatedFullCheck(truthOverride) {
+    const truth = truthOverride ?? simulatedThresholds(persona, session.events ?? []);
     const b = baselineTests(data);
     const ref = averageBaselines(b[0].thresholds, b[1].thresholds);
     const findings = evaluate(ref, truth).findings;

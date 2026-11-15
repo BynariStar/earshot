@@ -6,7 +6,7 @@ import { BANDS, spectrumOf, sourceNote, dominantBands, withFault, likelySource, 
 import { FAULT_SIGNATURE, FAULT_RISE_DB } from '../lib/alerts.js';
 
 // fault: true (the demo fault), { signature, rise } (a live incident), or nothing.
-export default function Spectrum({ id, fault, hideSource = false }) {
+export default function Spectrum({ id, fault, hideSource = false, showSources = true }) {
   const f = fault === true ? { signature: FAULT_SIGNATURE, rise: FAULT_RISE_DB } : fault || null;
   const sp = spectrumOf(id);
   const sig = SIGNATURES.find((s) => s.id === (f?.signature ?? FAULT_SIGNATURE));
@@ -69,8 +69,10 @@ export default function Spectrum({ id, fault, hideSource = false }) {
       </svg>
 
       <p className="small">Loudest for your ears at <strong>{dom.map((d) => bandLabel(d.band)).join(' and ')}</strong>.</p>
-      {sourceNote(id) && <p className="small"><span className="label-caps">NASA</span> {sourceNote(id)}</p>}
-      <details className="source-note">
+      {sourceNote(id) && (showSources || f) && (
+        <p className="small nasa-seen">{f && !showSources ? 'NASA has seen this here before: ' : 'NASA notes: '}{sourceNote(id)}</p>
+      )}
+      {showSources && <details className="source-note">
         <summary>Source</summary>
         <p className="muted small">
           {sp.kind === 'nc'
@@ -79,7 +81,7 @@ export default function Spectrum({ id, fault, hideSource = false }) {
           {src ? ` ${src.basis}` : ''}
 
         </p>
-      </details>
+      </details>}
     </div>
   );
 }

@@ -54,7 +54,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
   const checkId = check?.id ?? null;
   const shown = picked && picked.checkId === checkId ? picked : null; // the region popover, open on tap only
   const selected = shown ?? worst ?? { ear: 'left', frequency: 4000 };
-  const setSelected = (sel) => setPicked({ ...sel, checkId });
+  const setSelected = (sel) => setPicked((p) => (p && p.checkId === checkId && p.ear === sel.ear && p.frequency === sel.frequency ? null : { ...sel, checkId }));
 
   const findings = check?.confirmedFindings ?? [];
   const inputs = contextInputs(data);
@@ -121,7 +121,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
         {findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
         {earplugs.length > 0 && (findings.length ? findings.some((f) => f.kind === 'high') : !!worst && worst.frequency >= 2000) && (
           <p>
-            Earshot has added earplugs to today: {earplugs.join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See today</button>
+            Earshot has added earplugs to today: {earplugs.map((n) => n.replace(/^.*\((.*)\)$/, '$1')).join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See today</button>
           </p>
         )}
         {cogLine && (
@@ -130,12 +130,10 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
             <Info>{`Canadian Space Agency PRET open data: ${cog.detail}`}</Info>
           </p>
         )}
-        <div className="action-bar">
-          <div className="action-bar-inner">
-            {reference && <button className="primary" onClick={() => go('quick/general')}>Quick check · 2 min</button>}
-            {reference && <button className="secondary" onClick={() => setReporting('symptom')}>Report a symptom</button>}
-            {cta && <button className={reference ? 'secondary' : 'primary'} onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
-          </div>
+        <div className="ears-actions">
+          {reference && <button className="primary" onClick={() => go('quick/general')}>Quick check · 2 min</button>}
+          {reference && <button className="secondary" onClick={() => setReporting('symptom')}>Report a symptom</button>}
+          {cta && <button className={reference ? 'secondary' : 'primary'} onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
         </div>
       </div>
 
@@ -144,22 +142,24 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
           <figure key={ear} className="ear">
             <Cochlea ear={ear} statuses={statusByEar[ear]} selected={selected} onSelect={setSelected} />
             <figcaption>{ear === 'right' ? 'Right ear' : 'Left ear'}</figcaption>
-            {shown && shown.ear === ear && (
-              <div className="ear-pop" role="dialog" aria-label={`${cap(ear)} ear, ${info.label}`}>
-                <button className="sheet-close" onClick={() => setPicked(null)} aria-label="Close">×</button>
-                <strong>{info.label}</strong>
-                <p className={`status-text ${status}`}>
-                  <span className="status-icon" aria-hidden="true">{{ ok: '✓', watch: '◐', shift: '▲', urgent: '!', unmeasurable: '–', untested: '○' }[status]}</span> {STATUS_TEXT[status]}
-                  {Number.isFinite(delta) && status !== 'unmeasurable' && status !== 'untested' ? ` (${delta > 0 ? '+' : ''}${delta.toFixed(0)} dB)` : ''}
-                </p>
-                <p className="muted small">{info.hears}</p>
-              </div>
-            )}
           </figure>
         ))}
       </div>
+      {shown ? (
+        <div className={`band-detail ${status}`} aria-live="polite">
+          <div className="band-detail-head">
+            <strong>{cap(shown.ear)} ear · {info.label}</strong>
+            <button className="sheet-close" onClick={() => setPicked(null)} aria-label="Close">×</button>
+          </div>
+          <p className={`status-text ${status}`}>
+            <span className="status-icon" aria-hidden="true">{{ ok: '✓', watch: '◐', shift: '▲', urgent: '!', unmeasurable: '–', untested: '○' }[status]}</span> {STATUS_TEXT[status]}
+            {Number.isFinite(delta) && status !== 'unmeasurable' && status !== 'untested' ? ` (${delta > 0 ? '+' : ''}${delta.toFixed(0)} dB)` : ''}
+          </p>
+          <p className="muted">{info.hears}</p>
+        </div>
+      ) : null}
       <p className="muted small ears-caption">
-        Tap a band for details.
+        {shown ? 'Tap the band again to close.' : 'Tap a band for details.'}
         <Info>
           Each band sits where that pitch is heard along the cochlea: high pitches near the entrance, low pitches at the centre. Colours compare your latest check with your
           baseline, using NASA's hearing-shift rules: green steady, yellow 5 to 9 dB worse, orange 10 dB or more, red 30 dB or more, grey no response at baseline.

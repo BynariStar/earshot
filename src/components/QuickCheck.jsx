@@ -2,13 +2,13 @@
 // Reviewed and directed by the team. See AI_USE.md.
 // Quick check: about 2 minutes, at the pitches an exposure or symptom points to. A change of 10 dB or more
 // (NASA's shift size) asks for the full check; 30 dB or more points to a possible sudden drop.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import TestRunner from './TestRunner.jsx';
 import { averageBaselines, isNoResponse } from '../lib/rules.js';
 import { baselineTests } from '../lib/storage.js';
 import { quickPitchesFor, SYMPTOMS } from '../lib/alerts.js';
 import Info from './Info.jsx';
-import { simulatedThresholds } from '../lib/personas.js';
+import { scenarioThresholds, SCENARIOS } from '../lib/personas.js';
 import { simulate } from '../lib/threshold.js';
 import { bandLabel } from '../lib/spectrum.js';
 
@@ -26,6 +26,7 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
   const ref = baselines.length >= 2 ? averageBaselines(baselines[0].thresholds, baselines[1].thresholds) : null;
   const [stage, setStage] = useState('intro');
   const [result, setResult] = useState(null);
+  const truthRef = useRef(null); // the simulated truth, so a follow-up full check repeats the same scenario
 
   function finish(thresholds, simulated) {
     const changes = [];
@@ -40,8 +41,11 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
     setStage('result');
   }
 
+  const [scenario, setScenario] = useState('expected');
   function runSimulated() {
-    const truth = simulatedThresholds(persona, events);
+    const reportedEar = events.find((e) => e.type === 'ringing')?.ear;
+    const truth = scenarioThresholds(persona, events, scenario, reportedEar === 'left' ? 'left' : 'right');
+    truthRef.current = truth;
     const t = { left: {}, right: {} };
     for (const ear of ['left', 'right']) for (const f of pitches) t[ear][f] = simulate(f, ear, truth[ear][f]).threshold;
     finish(t, true);
@@ -89,7 +93,7 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
               Why
               <Info>A drop of 30 dB or more may be sudden hearing loss. Treatment works best when it starts early. If the full check confirms it, Earshot opens the sudden-drop response.</Info>
             </p>
-            {result.simulated ? <button className="primary" onClick={onSimulatedFullCheck}>Run the full check (simulated)</button> : <button className="primary" onClick={() => go('test/check')}>Full check now</button>}
+            {result.simulated ? <button className="primary" onClick={() => onSimulatedFullCheck(truthRef.current)}>Run the full check (simulated)</button> : <button className="primary" onClick={() => go('test/check')}>Full check now</button>}
           </>
         ) : w >= 10 ? (
           <>
@@ -129,8 +133,24 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
         2 minutes, both ears.
         <Info>Why these pitches: {WHY[kind] ?? WHY.general}. Use the same headphones and volume as your baseline, in the quietest spot you can find.</Info>
       </p>
-      <div className="action-bar no-tabs">
-        <div className="action-bar-inner">
+      {persona && (
+        <div className="scenarios">
+          <span className="label-caps">What should {persona.name} hear?</span>
+          <div className="rows">
+            {SCENARIOS.map((sc) => (
+              <button key={sc.id} className={`row${scenario === sc.id ? ' on' : ''}`} onClick={() => setScenario(sc.id)} aria-pressed={scenario === sc.id}>
+                <span>
+                  {sc.label}
+                  <span className="muted small scenario-note">{sc.note}</span>
+                </span>
+                {scenario === sc.id && <span aria-hidden="true">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="ears-actions quick-actions-row">
+        <div className="ears-actions">
           {persona ? (
             <button className="primary" onClick={runSimulated}>Simulate {persona.name}'s responses</button>
           ) : (

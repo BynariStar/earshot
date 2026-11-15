@@ -122,3 +122,24 @@ export function customPersona({ age = 40, sex = 'female', condition = 'high', ea
     baseThresholds: base,
   };
 }
+
+// Scenarios for a simulated check: what the simulated crew member "hears" this time. "As expected" follows
+// the crew member and today's events; the others replace today's change, on the ear the scenario names.
+export const SCENARIOS = [
+  { id: 'expected', label: 'As expected for this crew member', note: "Their own pattern plus today's events" },
+  { id: 'none', label: 'No change', note: 'Every pitch within a few dB of baseline' },
+  { id: 'temporary', label: 'Temporary change after noise', note: '+10 to +15 dB at 3 to 4 kHz in one ear' },
+  { id: 'low', label: 'Low-pitch change', note: "+10 to +15 dB at 250 and 500 Hz: NASA's common in-flight pattern" },
+  { id: 'sudden', label: 'Sudden drop', note: '30 dB or more at 2 to 4 kHz in one ear' },
+];
+export function scenarioThresholds(persona, events, scenarioId, ear = 'right') {
+  if (scenarioId === 'expected') return simulatedThresholds(persona, events);
+  const base = persona.baseThresholds ?? BASE;
+  const d = {
+    none: {},
+    temporary: { [ear]: { 2000: 5, 3000: 10, 4000: 15 } },
+    low: { [ear]: { 250: 15, 500: 10 } },
+    sudden: { [ear]: { 1000: 10, 2000: 35, 3000: 40, 4000: 35 } },
+  }[scenarioId];
+  return add(base, d);
+}

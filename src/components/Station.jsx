@@ -325,31 +325,30 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
         {compact && timebar}
         {showPanel && panelOpen && (
           <aside className="map-panel" aria-label={sel ? `${sel.label} details` : 'What is happening now'}>
+            {/* One header pattern: back on the left (details only), title in the middle, close on the right. */}
             <div className="panel-head">
-              {sel ? (
-                live || faultModule ? <button className="secondary back-now" onClick={() => setSelected(null)}>‹ Now</button> : <span />
-              ) : (
-                <span className="label-caps">Now</span>
-              )}
-              <button className="sheet-close" onClick={() => (sel && !live && !faultModule ? setSelected(null) : setPanelOpen(false))} aria-label={sel && !live && !faultModule ? 'Close' : 'Collapse the panel'}>
-                {sel && !live && !faultModule ? '×' : '›'}
-              </button>
+              {sel && (live || faultModule) ? <button className="secondary back-now" onClick={() => setSelected(null)}>‹ Now</button> : <span className="head-spacer" />}
+              <h3 className="panel-title">{sel ? sel.label : 'Now'}</h3>
+              <button className="sheet-close" onClick={() => { setPanelOpen(false); setSelected(null); }} aria-label="Close">×</button>
             </div>
             {sel ? (
               <>
                 {base ? (
-                  <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
+                  <BaseDetail compact={compact} part={sel} level={levels2[sel.id]} why={whys[sel.id]} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
                 ) : (
-                  <ModuleDetail part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} />
+                  <ModuleDetail compact={compact} part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} />
                 )}
                 {live && hereLog.length > 0 && (
                   <details className="here-log">
-                    <summary>History here ({hereLog.length})</summary>
-                    <ul className="feed">
+                    <summary>History <span className="muted">· {hereLog.length} {hereLog.length === 1 ? 'event' : 'events'}</span></summary>
+                    <ol className="timeline">
                       {hereLog.map((e) => (
-                        <li key={`${e.key}-${e.type}`} className={`feed-${e.type}`}><span className="muted">{clockAt(e.at)}</span> {e.type === 'start' ? e.inc.what : `${e.inc.fix}, back to normal`}</li>
+                        <li key={`${e.key}-${e.type}`} className={e.type}>
+                          <span className="tl-time">{clockAt(e.at)}</span>
+                          <span className="tl-text">{e.type === 'start' ? e.inc.what[0].toUpperCase() + e.inc.what.slice(1) : `${e.inc.fix[0].toUpperCase()}${e.inc.fix.slice(1)}, back to normal`}</span>
+                        </li>
                       ))}
-                    </ul>
+                    </ol>
                   </details>
                 )}
                 {live && onMoveMe && youStation === place && !sel.struct && sel.id !== you && (
@@ -449,7 +448,7 @@ function LiveIncident({ inc, since, delta, place }) {
   );
 }
 
-function BaseDetail({ part, level, why, fault, live, incident }) {
+function BaseDetail({ compact, part, level, why, fault, live, incident }) {
   return (
     <div className="module-detail">
       <h3>{part.label}</h3>
@@ -463,12 +462,12 @@ function BaseDetail({ part, level, why, fault, live, incident }) {
       )}
       {incident}
       <p className="small">{why}</p>
-      <Spectrum id={part.id} fault={fault} hideSource={!!incident} />
+      <Spectrum id={part.id} fault={fault} hideSource={!!incident} showSources={!compact} />
     </div>
   );
 }
 
-function ModuleDetail({ part, level, place, mode, fault, incident }) {
+function ModuleDetail({ part, level, place, mode, fault, incident, compact }) {
   const m = byId[part.id];
   const sleepers = SLEEP_IN[part.id] ?? [];
   return (
@@ -484,8 +483,8 @@ function ModuleDetail({ part, level, place, mode, fault, incident }) {
         <p className="muted">No dBA value published (reported only as meeting NASA's NC-50 limit, or not measured).</p>
       )}
       {incident}
-      {m?.date && <p className="muted">NASA survey of {m.date}</p>}
-      {place === 'iss' && !part.struct && <Spectrum id={part.id} fault={fault} hideSource={!!incident} />}
+      {m?.date && !compact && <p className="muted">NASA survey of {m.date}</p>}
+      {place === 'iss' && !part.struct && <Spectrum id={part.id} fault={fault} hideSource={!!incident} showSources={!compact} />}
       {sleepers.length > 0 && (
         <div className="sleep-line">
           <p className="small">

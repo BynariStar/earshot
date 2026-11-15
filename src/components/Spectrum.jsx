@@ -13,8 +13,14 @@ export default function Spectrum({ id, fault, hideSource = false }) {
   if (!sp) {
     return f ? (
       <div className="spectrum">
-        <h4>Where it's coming from</h4>
-        <p className="small">Likely source: <strong>{sig.name.toLowerCase()}</strong>, from the rise at {sig.bands.map(bandLabel).join(' and ')}. {sig.basis}</p>
+        {!hideSource && (
+          <div className="live-incident">
+            <span className="label-caps">Likely source</span>
+            <p className="source-big">{sig.name}</p>
+            <p className="source-detail">Louder at {sig.bands.map(bandLabel).join(' and ')}.</p>
+          </div>
+        )}
+        <p className="muted small">{sig.basis}</p>
       </div>
     ) : null;
   }
@@ -27,6 +33,13 @@ export default function Spectrum({ id, fault, hideSource = false }) {
   const Y = (v) => T + ((hi - v) / (hi - lo)) * (H - T - B);
   return (
     <div className="spectrum">
+      {src && !hideSource && (
+        <div className="live-incident">
+          <span className="label-caps">Likely source</span>
+          <p className="source-big">{src.name}</p>
+          <p className="source-detail">Louder at {src.bands.map(bandLabel).join(' and ')}.</p>
+        </div>
+      )}
       <h4>By pitch</h4>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Noise level by octave band">
         {[30, 50, 70].map((v) => (
@@ -54,11 +67,7 @@ export default function Spectrum({ id, fault, hideSource = false }) {
           );
         })}
       </svg>
-      {src && !hideSource && (
-        <p className="small fault-note">
-          Likely source: <strong>{src.name.toLowerCase()}</strong>. The rise is at {src.bands.map(bandLabel).join(' and ')}.
-        </p>
-      )}
+
       <p className="small">Loudest for your ears at <strong>{dom.map((d) => bandLabel(d.band)).join(' and ')}</strong>.</p>
       {sourceNote(id) && <p className="small"><span className="label-caps">NASA</span> {sourceNote(id)}</p>}
       <details className="source-note">

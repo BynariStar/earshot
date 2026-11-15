@@ -20,7 +20,7 @@ import Picker from './Picker.jsx';
 import { faultDelta } from '../lib/spectrum.js';
 import { STATIONS } from '../lib/session.js';
 import { liveFrame, jitter, incidentDelta, whereAt, signatureOf } from '../lib/live.js';
-import { BASES, ATMOSPHERES, EXERCISE_SESSIONS, baseLevel, pressureDelta, SPEC_WORK_DBA, SPEC_SLEEP_DBA } from '../lib/bases.js';
+import { BASES, ATMOSPHERES, EXERCISE_SESSIONS, baseLevel, SPEC_WORK_DBA, SPEC_SLEEP_DBA } from '../lib/bases.js';
 
 // A word for each colour band, so level never depends on colour alone.
 const bandWord = (v) => (!Number.isFinite(v) ? '' : v <= 50 ? 'Quiet' : v <= 60 ? 'Moderate' : v <= 65 ? 'Loud' : 'Very loud');
@@ -328,19 +328,19 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
             {sel ? (
               <>
                 {base ? (
-                  <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} atm={atm} basis={basis} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
+                  <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
                 ) : (
                   <ModuleDetail part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} />
                 )}
                 {live && hereLog.length > 0 && (
-                  <>
-                    <h4>History here</h4>
+                  <details className="here-log">
+                    <summary>History here ({hereLog.length})</summary>
                     <ul className="feed">
                       {hereLog.map((e) => (
                         <li key={`${e.key}-${e.type}`} className={`feed-${e.type}`}><span className="muted">{clockAt(e.at)}</span> {e.type === 'start' ? e.inc.what : `${e.inc.fix}, back to normal`}</li>
                       ))}
                     </ul>
-                  </>
+                  </details>
                 )}
                 {live && onMoveMe && youStation === place && !sel.struct && sel.id !== you && (
                   <button className="secondary small-btn" onClick={() => onMoveMe(sel.id)}>Move me here (demo)</button>
@@ -389,7 +389,6 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
                   </>
                 )}
                 <p className="muted small">Tap {place === 'chamber' ? 'a floor' : place === 'iss' ? 'a module' : 'an area'} for its noise by pitch.</p>
-                {live && <p className="muted small">Simulated feed: faults NASA has reported on the ISS, replayed on a loop over the {place === 'iss' ? 'measured averages' : 'simulated averages'}. Earshot assumes it knows which module you're in.</p>}
               </>
             )}
           </aside>
@@ -420,34 +419,27 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
 // A live incident in the selected area: what happened, since when, and where the noise comes from.
 function LiveIncident({ inc, since, delta, place }) {
   const sig = inc.kind === 'fault' ? signatureOf(inc.signature) : null;
+  const hz = (b) => (b >= 1000 ? `${b / 1000} kHz` : `${b} Hz`);
+  const source = sig ? sig.name : place === 'iss' ? 'T2 treadmill in use' : 'Exercise machine in use';
   return (
     <div className="live-incident">
-      <p>
-        <span className="event-dot" aria-hidden="true" /> <strong>{inc.what[0].toUpperCase() + inc.what.slice(1)}</strong> since {since}
-        {Number.isFinite(delta) && delta > 0.05 ? `, +${delta.toFixed(1)} dBA` : ''}
+      <span className="label-caps">Likely source</span>
+      <p className="source-big">
+        <span className="event-dot" aria-hidden="true" /> {source}
       </p>
-      <p className="source-line">
-        <span className="label-caps">Source</span>{' '}
-        {sig ? (
-          <>
-            likely a {sig.name.toLowerCase()}: the rise is at {sig.bands.map((b) => (b >= 1000 ? `${b / 1000} kHz` : `${b} Hz`)).join(' and ')}.
-            <Info>{sig.basis}{inc.illustrative ? ' Placed here for illustration; NASA reported it elsewhere on the ISS.' : ''}</Info>
-          </>
-        ) : place === 'iss' ? (
-          <>
-            the T2 treadmill, in use.
-            <Info>NASA measured 84.5 dBA at the runner's head (Allen & Danielson 2020).</Info>
-          </>
-        ) : (
-          'the exercise machine, in use.'
-        )}
+      <p className="source-detail">
+        {sig ? `Louder at ${sig.bands.map(hz).join(' and ')}` : inc.what[0].toUpperCase() + inc.what.slice(1)}
+        {Number.isFinite(delta) && delta > 0.05 ? `, +${delta.toFixed(1)} dBA` : ''} · since {since}
+        <Info>
+          {sig ? sig.basis : "NASA measured 84.5 dBA at the runner's head (Allen & Danielson 2020)."}
+          {inc.illustrative ? ' Placed here for illustration; NASA reported it elsewhere on the ISS.' : ''}
+        </Info>
       </p>
     </div>
   );
 }
 
-function BaseDetail({ part, level, why, atm, basis, fault, live, incident }) {
-  const d = pressureDelta(atm);
+function BaseDetail({ part, level, why, fault, live, incident }) {
   return (
     <div className="module-detail">
       <h3>{part.label}</h3>
@@ -462,17 +454,6 @@ function BaseDetail({ part, level, why, atm, basis, fault, live, incident }) {
       {incident}
       <p className="small">{why}</p>
       <Spectrum id={part.id} fault={fault} hideSource={!!incident} />
-      {atm !== '14.7' && (
-        <>
-          <h4>Lower cabin pressure</h4>
-          <p className="small">
-            {basis === 'iss'
-              ? `Thinner air carries the same fans differently. Our estimate from the standard fan laws: about ${d.sameSpeed.toFixed(1)} dB if the fans keep their speed, or ${d.sameMass > 0 ? '+' : ''}${d.sameMass.toFixed(1)} dB if they spin faster to move the same mass of air for cooling and CO₂ removal. Real designs would sit in between or be re-engineered.`
-              : "NASA's limits apply at any cabin pressure, so a compliant room meets them either way."}
-          </p>
-          <p className="small">Headphone output also changes with air pressure, so hearing baselines must be taken at the habitat's own pressure.</p>
-        </>
-      )}
     </div>
   );
 }

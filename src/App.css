@@ -1035,9 +1035,3 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 .callout.compact.trend .callout-dot { animation: none; }
 .callout.compact.trend .callout-bang { color: #1a1a1a; }
 .callout.compact::after { bottom: -6px; width: 10px; height: 10px; }
-@media (hover: hover) {
-  .callout.compact:hover, .callout.compact:focus-visible { padding: 8px 12px; border-radius: 14px; gap: 8px; }
-  .callout.compact:hover .callout-dot, .callout.compact:focus-visible .callout-dot { width: 10px; height: 10px; }
-  .callout.compact:hover .callout-bang, .callout.compact:focus-visible .callout-bang { display: none; }
-  .callout.compact:hover .callout-text, .callout.compact:hover .callout-more, .callout.compact:focus-visible .callout-text, .callout.compact:focus-visible .callout-more { display: inline; }
-}

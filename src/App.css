@@ -850,3 +850,5 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
   .station-stage:has(.map-panel) .map-r { right: 344px; }
   .station-stage:has(.map-panel) .map-key { right: 408px; }
 }
+/* Day view: leave room for the timeline above the tab bar */
+.home-stage:has(~ .timebar) .station3d, .station-home .station:has(.timebar) .home-stage .station3d { height: clamp(300px, calc(100vh - 280px), 600px); }

@@ -175,12 +175,6 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     controls.minDistance = 12;
     controls.maxDistance = 180;
 
-    // A static view; a hint shows that it turns, and goes away once the user does.
-    const hint = document.createElement('div');
-    hint.className = 'hint3d';
-    hint.innerHTML = '<span class="hint3d-icon" aria-hidden="true">⟲</span> Drag to rotate · scroll or pinch to zoom';
-    mount.appendChild(hint);
-    controls.addEventListener('start', () => hint.classList.add('gone'));
 
     // Optional on-map buttons (behind a toggle): turn, zoom, reset, without dragging.
     const home = cam.position.clone();
@@ -286,7 +280,6 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerleave', onLeave);
       tip.remove();
-      hint.remove();
       scene.traverse((o) => {
         o.geometry?.dispose?.();
         o.material?.dispose?.();

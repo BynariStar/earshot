@@ -254,7 +254,7 @@ export default function App() {
 
   if (!section || section === 'home' || !TITLES[section]) {
     return (
-      <div className="app">
+      <div className="app home-app">
         <StationHome
           session={session}
           persona={persona}

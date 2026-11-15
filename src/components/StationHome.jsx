@@ -29,21 +29,9 @@ export default function StationHome({ session, persona, focus, onEvent, onClearE
   const parts = partsOf(session.station).filter((p) => !p.struct);
   return (
     <div className="station-home">
-      <header className="home-head">
-        <img className="brand-mark" src="./favicon.svg" alt="" aria-hidden="true" />
-        <div className="home-title">
-          <h1>{st.name}</h1>
-          <button className="who-btn" onClick={onChange}>
-            {persona ? `${persona.name} (simulated)` : 'You'} <span aria-hidden="true">›</span>
-          </button>
-        </div>
-        <div className="head-tools">
-          <button className="secondary head-btn" onClick={() => setSheet('demo')}>
-            <span className="wide-only">Demo controls</span>
-            <span className="narrow-only">Demo</span>
-          </button>
-        </div>
-      </header>
+      <button className="demo-fab" onClick={() => setSheet('demo')} aria-label="Demo controls">
+        <span aria-hidden="true">⚙</span> Demo
+      </button>
 
       <Suspense fallback={<p className="muted">Loading the station…</p>}>
         <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact liveStart={liveStart} pausedAt={pausedAt} onTogglePause={onTogglePause} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={onMoveMe} />
@@ -51,6 +39,7 @@ export default function StationHome({ session, persona, focus, onEvent, onClearE
 
       {sheet === 'demo' && (
         <Sheet title="Demo controls" onClose={close}>
+          <p className="muted demo-who">{persona ? `${persona.name} (simulated)` : 'You (your own baseline)'} · {st.name}</p>
           <div className="rows">
             <button className="row" onClick={() => setSheet('move')}>
               <span>Move me to…<span className="muted small"> {session.youAt ? parts.find((p) => p.id === session.youAt)?.label : 'following my schedule'}</span></span>
@@ -68,7 +57,7 @@ export default function StationHome({ session, persona, focus, onEvent, onClearE
               <span>Start over</span>
             </button>
             <button className="row" onClick={() => { close(); onChange(); }}>
-              <span>Change station or crew member</span><span aria-hidden="true">›</span>
+              <span>Change crew member or station</span><span aria-hidden="true">›</span>
             </button>
           </div>
         </Sheet>

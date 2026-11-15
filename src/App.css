@@ -852,3 +852,50 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 }
 /* Day view: leave room for the timeline above the tab bar */
 .home-stage:has(~ .timebar) .station3d, .station-home .station:has(.timebar) .home-stage .station3d { height: clamp(300px, calc(100vh - 280px), 600px); }
+
+/* ===== No top bar: full-screen map, floating rail/dock, floating Demo button ===== */
+:root { --rail-w: 96px; }
+.home-app { max-width: none; padding: 0; }
+.station-home .station { margin: 0; }
+.home-app .home-stage .station3d, .home-app .station:has(.timebar) .home-stage .station3d { height: 100vh; height: 100dvh; }
+.home-app .map-tl { top: 16px; left: calc(var(--rail-w) + 16px); }
+.home-app .map-panel { top: 16px; bottom: 16px; right: 16px; }
+.home-app .panel-tab { top: 16px; right: 16px; }
+/* Rail (laptop, tablet) */
+.navrail { left: 12px; right: auto; top: 50%; bottom: auto; transform: translateY(-50%); height: auto; width: 76px; grid-template-columns: 1fr; grid-auto-rows: 72px; gap: 4px; padding: 8px 0; border: 1px solid var(--border); border-radius: 22px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(8px); }
+.navrail .tab { border-radius: 16px; margin: 0 6px; font-size: 0.78rem; }
+.navrail .tab.on { background: var(--surface-2); }
+.app { padding-left: calc(var(--rail-w) + 8px); padding-bottom: 24px; }
+.app.home-app { padding-left: 0; padding-bottom: 0; }
+.app.standalone { padding-left: 16px; }
+.action-bar { bottom: 0; left: var(--rail-w); }
+.app:has(.action-bar) { padding-bottom: 100px; }
+/* Day timeline floats at the bottom of the map */
+.map-time { position: absolute; z-index: 6; left: 50%; transform: translateX(-50%); bottom: 20px; width: min(720px, calc(100% - 2 * var(--rail-w) - 120px)); margin: 0; padding: 8px 10px; border-radius: 18px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 94%, transparent); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
+.station-stage:has(.map-panel) .map-time { left: calc(50% - 190px); width: min(560px, calc(100% - var(--rail-w) - 440px)); }
+/* Floating Demo button */
+.demo-fab { position: fixed; z-index: 36; right: 16px; bottom: 16px; min-height: 52px; padding: 0 18px; border-radius: 999px; border: 1px dashed var(--muted); background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--muted); font: inherit; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px; }
+.station-stage:has(.map-panel) ~ .demo-fab, .station-home:has(.map-panel) .demo-fab { right: 416px; }
+.demo-who { margin: 0 0 10px; }
+.you-btn.map-chip { gap: 8px; }
+.map-r { top: 50%; }
+@media (max-width: 700px) {
+  :root { --rail-w: 0px; }
+  .navrail { left: 12px; right: 12px; top: auto; bottom: 12px; transform: none; width: auto; height: 68px; grid-template-columns: repeat(4, 1fr); grid-auto-rows: auto; padding: 0 4px; }
+  .navrail .tab { margin: 6px 2px; }
+  .app { padding-left: 0; padding-bottom: 96px; }
+  .action-bar { left: 0; bottom: 88px; }
+  .app:has(.action-bar) { padding-bottom: 180px; }
+  .home-app .map-tl { left: 12px; top: 12px; }
+  .map-time { bottom: 96px; width: calc(100% - 24px); }
+  .station-stage:has(.map-panel) .map-time { left: 50%; width: calc(100% - 24px); }
+  .demo-fab { bottom: 96px; right: 12px; }
+  .station-home:has(.map-panel) .demo-fab { right: 12px; }
+  .home-app .map-panel { bottom: 0; top: auto; right: 0; }
+  .home-app .panel-tab { top: auto; bottom: 96px; left: 12px; right: auto; }
+}
+.mode-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; border: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 82%, transparent); }
+.pill-play { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--surface-2); color: var(--text); font-size: 0.95rem; }
+.pill-seg { min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 1rem; display: inline-flex; align-items: center; gap: 8px; }
+.pill-seg.on { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+@media (max-width: 400px) { .pill-seg { padding: 0 12px; } }

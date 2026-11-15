@@ -196,6 +196,20 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
     setPanelOpen(true);
   };
 
+  const timebar = mode === 'now' && (
+        <div className={`timebar${compact ? ' map-time' : ''}`}>
+          {!compact && (
+            <button className="secondary play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play the day'}>
+              {playing ? '❚❚' : '▶'}
+            </button>
+          )}
+          <button className="secondary step-hour" onClick={() => { setT((x) => (x + 1380) % 1440); setPlaying(false); }} aria-label="One hour earlier">−1 h</button>
+          <button className="secondary step-hour" onClick={() => { setT((x) => (x + 60) % 1440); setPlaying(false); }} aria-label="One hour later">+1 h</button>
+          <input type="range" min="0" max="1435" step="5" value={t} onChange={(e) => { setT(Number(e.target.value)); setPlaying(false); }} aria-label="Time of day" />
+          <span className="clock">{clock(t)}</span>
+        </div>
+  );
+
   return (
     <section className="station">
       {!lockedPlace && <div className="station-controls">
@@ -251,27 +265,29 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
         />
 
         <div className="map-overlay map-tl">
-          {live && (
-            <div className="live-ctl">
-              <span className={`map-chip${pausedAt ? ' paused' : ''}`}>
-                <span className={pausedAt ? 'pause-dot' : 'live-dot'} aria-hidden="true" /> {pausedAt ? 'Paused' : 'Live'}
-                <Info>Simulated: faults NASA has reported on the ISS, replayed on a loop over the {place === 'iss' ? 'measured averages' : 'simulated averages'}. Earshot assumes it knows which module you're in.</Info>
-              </span>
-              {onTogglePause && (
-                <button className="icon-button map-icon" onClick={onTogglePause} aria-label={pausedAt ? 'Play the simulated feed (P)' : 'Pause the simulated feed (P)'} title={pausedAt ? 'Play (P)' : 'Pause (P)'}>
-                  {pausedAt ? '▶' : '❚❚'}
-                </button>
-              )}
-            </div>
-          )}
-          <div className="map-mode">
-          <Segmented
-            label="View"
-            value={mode}
-            onChange={(v) => { setMode(v); setPlaying(false); }}
-            options={place === 'chamber' ? [['now', 'Day'], ['avg', 'Average']] : [['live', 'Live'], ['now', 'Day'], ['avg', 'Average']]}
-          />
+          {/* One control: play/pause for whatever is running (the live feed, or the day replay) + the view switch. */}
+          <div className="mode-pill" role="group" aria-label="View">
+            {(live ? !!onTogglePause : mode === 'now') && (
+              <button
+                className="pill-play"
+                onClick={live ? onTogglePause : () => setPlaying((p) => !p)}
+                aria-label={live ? (pausedAt ? 'Play the live feed (P)' : 'Pause the live feed (P)') : playing ? 'Pause the day' : 'Play the day'}
+              >
+                {(live ? !pausedAt : playing) ? '❚❚' : '▶'}
+              </button>
+            )}
+            {(place === 'chamber' ? [['now', 'Day'], ['avg', 'Average']] : [['live', 'Live'], ['now', 'Day'], ['avg', 'Average']]).map(([v, label]) => (
+              <button key={v} className={`pill-seg${mode === v ? ' on' : ''}`} aria-pressed={mode === v} onClick={() => { setMode(v); setPlaying(false); }}>
+                {v === 'live' && <span className={live && pausedAt ? 'pause-dot' : 'live-dot'} aria-hidden="true" />}
+                {v === 'live' && live && pausedAt ? 'Paused' : label}
+              </button>
+            ))}
           </div>
+          {you && (
+            <button className="you-btn map-chip" onClick={() => pick(you)}>
+              <span className="you-dot" aria-hidden="true" /> You: <strong>{partLabel(you)}</strong>
+            </button>
+          )}
           {!live && mode === 'now' && events.length > 0 && <p className="map-note">{events[0].text}</p>}
         </div>
         {showKey && (
@@ -295,14 +311,8 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           <button className={`map-icon key-btn${showKey ? ' on' : ''}`} onClick={() => setShowKey((v) => !v)} aria-pressed={showKey}>Key</button>
           <button className={`map-icon${viewCtl ? ' on' : ''}`} onClick={() => setViewCtl((v) => !v)} aria-pressed={viewCtl} aria-label="Map buttons: turn and zoom">✥</button>
         </div>
-        {you && (
-          <div className="map-overlay map-bl">
-            <button className="you-btn" onClick={() => pick(you)}>
-              <span className="you-dot" aria-hidden="true" /> You: <strong>{partLabel(you)}</strong>
-            </button>
-          </div>
-        )}
 
+        {compact && timebar}
         {showPanel && panelOpen && (
           <aside className="map-panel" aria-label={sel ? `${sel.label} details` : 'What is happening now'}>
             <div className="panel-head">
@@ -379,6 +389,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
                   </>
                 )}
                 <p className="muted small">Tap {place === 'chamber' ? 'a floor' : place === 'iss' ? 'a module' : 'an area'} for its noise by pitch.</p>
+                {live && <p className="muted small">Simulated feed: faults NASA has reported on the ISS, replayed on a loop over the {place === 'iss' ? 'measured averages' : 'simulated averages'}. Earshot assumes it knows which module you're in.</p>}
               </>
             )}
           </aside>
@@ -389,17 +400,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           </button>
         )}
       </div>
-      {mode === 'now' && (
-        <div className="timebar">
-          <button className="secondary play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play the day'}>
-            {playing ? '❚❚' : '▶'}
-          </button>
-          <button className="secondary step-hour" onClick={() => { setT((x) => (x + 1380) % 1440); setPlaying(false); }} aria-label="One hour earlier">−1 h</button>
-          <button className="secondary step-hour" onClick={() => { setT((x) => (x + 60) % 1440); setPlaying(false); }} aria-label="One hour later">+1 h</button>
-          <input type="range" min="0" max="1435" step="5" value={t} onChange={(e) => { setT(Number(e.target.value)); setPlaying(false); }} aria-label="Time of day" />
-          <span className="clock">{clock(t)}</span>
-        </div>
-      )}
+      {!compact && timebar}
 
       {place === 'chamber' && <ChamberChart floor={selected ? Number(selected.replace('floor', '')) : 1} t={mode === 'now' ? t : null} />}
       {place === 'iss' && !compact && (

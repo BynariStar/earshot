@@ -61,8 +61,38 @@ function addGround(scene, color) {
   scene.add(ground);
 }
 
-export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight }) {
+// "You are here": a constant-size label above the crew member's module, drawn on top of everything.
+function makeYouMarker() {
+  const c = document.createElement('canvas');
+  c.width = 160;
+  c.height = 96;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  g.roundRect(20, 8, 120, 52, 26);
+  g.fill();
+  g.beginPath();
+  g.moveTo(68, 58);
+  g.lineTo(80, 80);
+  g.lineTo(92, 58);
+  g.fill();
+  g.fillStyle = '#0b1020';
+  g.font = '600 32px Inter, system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('You', 80, 35);
+  const tex = new THREE.CanvasTexture(c);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, sizeAttenuation: false }));
+  sprite.scale.set(0.09, 0.054, 1);
+  sprite.center.set(0.5, 0.05);
+  sprite.renderOrder = 10;
+  sprite.visible = false;
+  return sprite;
+}
+
+export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null }) {
   const mountRef = useRef(null);
+  const markerRef = useRef(null);
   const meshesRef = useRef({});
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -103,6 +133,9 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       meshes[p.id] = m;
     }
     meshesRef.current = meshes;
+    const marker = makeYouMarker();
+    scene.add(marker);
+    markerRef.current = marker;
     if (decor === 'iss') addIssDecor(scene);
     if (decor === 'moon') addGround(scene, '#3d4049');
     if (decor === 'mars') addGround(scene, '#6b3420');
@@ -203,6 +236,20 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parts, decor]);
+
+  // Move the "You" label to the top of the crew member's module.
+  useEffect(() => {
+    const marker = markerRef.current;
+    const mesh = you && meshesRef.current[you];
+    if (!marker) return;
+    if (!mesh) {
+      marker.visible = false;
+      return;
+    }
+    const box = new THREE.Box3().setFromObject(mesh);
+    marker.position.set((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2);
+    marker.visible = true;
+  }, [you, parts]);
 
   // Recolour without rebuilding when levels or selection change.
   useEffect(() => {

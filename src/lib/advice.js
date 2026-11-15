@@ -27,7 +27,7 @@ export function explain(finding) {
         title: `Low-pitch shift in your ${ear}`,
         what: `Your 250 and 500 Hz hearing averages ${atLeast(finding)}${finding.averageDb.toFixed(0)} dB worse than your baseline, confirmed by a retest. This matches NASA's low-frequency shift rule. NASA sees it in about 40% of in-flight tests and doesn't yet know the cause; fluid shifts and pressure inside the head are leading ideas.`,
         actions: [
-          'Log context: ear fullness, congestion, headache, recent pressure changes.',
+          'Tell your crew medical officer about any ear fullness, congestion or headache.',
           'Retest tomorrow at the same time, in the same quiet place and headphones.',
           'If it is still there on the next check, tell your crew medical officer.',
         ],

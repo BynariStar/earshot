@@ -1,26 +1,30 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
+// My ears: one verdict first (what changed, how much, what to do), "Why" on request, then the two cochleas
+// and one simple line of change over time.
 import { useMemo, useState } from 'react';
 import Cochlea from './Cochlea.jsx';
 import { averageBaselines, shifts, regionStatusFor, FREQUENCIES } from '../lib/rules.js';
 import { REGION_INFO } from '../lib/cochlea.js';
 import { explain } from '../lib/advice.js';
 import { baselineTests, latestCheck, isNoisy } from '../lib/storage.js';
+import { hearingState } from '../lib/personal.js';
 import Trend from './Trend.jsx';
-import ContextStrip from './ContextStrip.jsx';
 import { compareAll, contextInputs, bandOf } from '../lib/context.js';
 
 const STATUS_TEXT = {
   untested: 'Not tested yet',
   ok: 'Steady: within 5 dB of your baseline',
-  watch: 'Watch: 5 to 9 dB worse than your baseline (within test-to-test variation)',
-  shift: 'Shift: 10 dB or more worse than your baseline',
-  urgent: 'Urgent: 30 dB or more worse than your baseline',
-  unmeasurable: 'Not measurable: no response here at baseline, so a change can’t be tracked',
+  watch: 'Watch: 5 to 9 dB worse, within test error',
+  shift: 'Shift: 10 dB or more worse',
+  urgent: 'Urgent: 30 dB or more worse',
+  unmeasurable: 'Not measurable: no response at baseline',
 };
 const RANK = { urgent: 4, shift: 3, watch: 2 };
+const hz = (f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`);
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
-export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpenNormal, onOpenSudden }) {
+export default function Home({ data, onStartTest, onOpenSudden, simulated }) {
   const [picked, setPicked] = useState(null);
   const baselines = baselineTests(data);
   const check = latestCheck(data);
@@ -33,8 +37,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpen
     return check ? { ...out, raw: shifts(reference, check.thresholds) } : out;
   }, [reference, check]);
 
-  // Open on the region that changed most, so the first thing you see is what matters. A region you
-  // click stays selected until a new check comes in.
+  // The region that changed most: the verdict is about it, and the cochlea opens on it.
   const worst = useMemo(() => {
     let best = null;
     for (const ear of ['left', 'right'])
@@ -43,7 +46,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpen
         const d = statusByEar.raw?.[ear]?.perFreq?.[f] ?? 0;
         if (r && (!best || r > best.r || (r === best.r && d > best.d))) best = { ear, frequency: f, r, d };
       }
-    return best && { ear: best.ear, frequency: best.frequency };
+    return best;
   }, [statusByEar]);
   const checkId = check?.id ?? null;
   const selected = picked && picked.checkId === checkId ? picked : worst ?? { ear: 'left', frequency: 4000 };
@@ -55,63 +58,57 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpen
   const status = statusByEar[selected.ear]?.[selected.frequency] ?? 'untested';
   const delta = statusByEar.raw?.[selected.ear]?.perFreq?.[selected.frequency];
 
-  let callToAction;
-  if (baselines.length === 0) callToAction = { label: 'Set your baseline (test 1 of 2)', role: 'baseline' };
-  else if (baselines.length === 1) callToAction = { label: 'Finish your baseline (test 2 of 2)', role: 'baseline' };
-  else callToAction = { label: 'Check my hearing', role: 'check' };
+  // The verdict.
+  let title, sub, actions = [], why = null, cta = null;
+  if (baselines.length < 2) {
+    title = baselines.length ? 'Finish your baseline' : 'Set your baseline';
+    sub = baselines.length ? 'One more 8-minute test. Every later check compares against these two.' : 'Two 8-minute tests on your own headphones. Every later check compares against them.';
+    cta = { label: baselines.length ? 'Baseline test 2 of 2' : 'Baseline test 1 of 2', role: 'baseline' };
+  } else if (!check) {
+    title = 'Baseline set';
+    sub = 'Earshot asks for a check after loud exposures, or you can run one now.';
+    cta = { label: 'Check my hearing', role: 'check' };
+  } else if (findings.length) {
+    const f = findings.find((x) => x.kind === 'sudden') ?? findings[0];
+    const e = explain(f);
+    title = e.title;
+    sub = e.what;
+    actions = e.actions;
+    if (f.kind !== 'sudden') why = compareAll(f.averageDb, f.kind, inputs);
+  } else if (worst) {
+    const w = statusByEar.raw[worst.ear].perFreq[worst.frequency];
+    title = `${cap(worst.ear)} ear, ${hz(worst.frequency)}: ${Math.round(w)} dB worse than your baseline`;
+    sub = `Within test error, so it may be chance.${hearingState(data).state === 'high' ? ' Stricter noise targets are on until it settles.' : ''}`;
+    why = compareAll(w, bandOf(worst.frequency), inputs).filter((r) => r.id !== 'cognition');
+  } else {
+    title = 'Both ears steady';
+    sub = 'Every pitch within 5 dB of your baseline.';
+  }
+  if (!cta && !simulated && check) cta = { label: 'Check my hearing', role: 'check' };
 
   return (
     <section className="home">
-      {data.demo && (
-        <div className="demo-banner">
-          <strong>Simulated crew member: not a real person.</strong> Built from NASA's published statistics.{' '}
-          <button className="link-button" onClick={onExitDemo}>Change</button>
-        </div>
-      )}
-      <div className="home-intro">
-        <h1>Your inner ear, by pitch</h1>
-        <p>
-          Each coloured band sits where that pitch is heard along your cochlea: high pitches at the outer base, low pitches near the
-          centre. Colours compare your latest check with your own baseline, using NASA's hearing-shift rules.
-        </p>
-        {data.demo ? (
-          <button className="primary" onClick={onExitDemo}>
-            Switch to my own ears
-          </button>
-        ) : (
-          <button className="primary" onClick={() => onStartTest(callToAction.role)}>
-            {callToAction.label}
-          </button>
+      <div className="ears-verdict">
+        <h2>{title}</h2>
+        <p>{sub}</p>
+        {check && isNoisy(check) && <p className="noisy-note">This check was measured in noise. Retest somewhere quiet.</p>}
+        {actions.length > 0 && <ul className="verdict-actions">{actions.map((a) => <li key={a}>{a}</li>)}</ul>}
+        {findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
+        {why && (
+          <details className="why">
+            <summary>Why</summary>
+            <ul>
+              {why.filter((r) => r.level !== 'none').map((r) => (
+                <li key={r.id}>
+                  <strong>{r.question}</strong> {r.verdict} <span className="muted small">{r.source}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
-        {onLoadDemo && !data.demo && data.tests.length === 0 && (
-          <button className="link-button" onClick={onLoadDemo}>or explore with a simulated demo astronaut</button>
-        )}
-        {check && (
-          <p className="muted">
-            Last check: {Number.isFinite(check.missionDay) ? `mission day ${check.missionDay}` : new Date(check.date).toLocaleString()}
-          </p>
-        )}
-        {check && isNoisy(check) && (
-          <p className="noisy-note">Your latest check was measured in noise. Treat its colours as unreliable and retest somewhere quiet.</p>
-        )}
+        {cta && <button className="secondary" onClick={() => onStartTest(cta.role)}>{cta.label}</button>}
+        {check && <p className="muted small">Last check: {Number.isFinite(check.missionDay) ? `mission day ${check.missionDay}` : new Date(check.date).toLocaleString()}</p>}
       </div>
-
-      {findings.length > 0 && (
-        <div className="findings">
-          {findings.map((f, i) => {
-            const e = explain(f);
-            return (
-              <article key={i} className={`finding ${e.level}`}>
-                <h3>{e.title}</h3>
-                <p>{e.what}</p>
-                <ul>{e.actions.map((a) => <li key={a}>{a}</li>)}</ul>
-                {f.kind === 'sudden' && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
-                {f.kind !== 'sudden' && <ContextStrip rows={compareAll(f.averageDb, f.kind, inputs)} onMore={onOpenNormal} />}
-              </article>
-            );
-          })}
-        </div>
-      )}
 
       <div className="ears">
         {['left', 'right'].map((ear) => (
@@ -121,24 +118,24 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpen
           </figure>
         ))}
         <aside className="region-panel" aria-live="polite">
-          <h2>
+          <h3>
             {selected.ear === 'right' ? 'Right' : 'Left'} ear · {info.label}
-          </h2>
+          </h3>
           <p className={`status-pill ${status}`}>{STATUS_TEXT[status]}</p>
-          {Number.isFinite(delta) && status !== 'unmeasurable' && <p className="muted">Change from baseline: {delta > 0 ? '+' : ''}{delta.toFixed(0)} dB (higher = harder to hear)</p>}
-          <h3>What this part hears</h3>
+          {Number.isFinite(delta) && status !== 'unmeasurable' && status !== 'untested' && <p className="muted small">{delta > 0 ? '+' : ''}{delta.toFixed(0)} dB from your baseline (higher = harder to hear)</p>}
+          <h4>What this part hears</h4>
           <p>{info.hears}</p>
-          <h3>What NASA knows</h3>
+          <h4>What NASA knows</h4>
           <p>{info.nasa}</p>
-          {Number.isFinite(delta) && status !== 'unmeasurable' && delta >= 5 && <ContextStrip rows={compareAll(delta, bandOf(selected.frequency), inputs)} onMore={onOpenNormal} />}
         </aside>
       </div>
-      <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
+      <p className="muted small ears-caption">Each band sits where that pitch is heard along the cochlea. Colours compare your latest check with your baseline, using NASA's hearing-shift rules.</p>
       <div className="legend">
         {['ok', 'watch', 'shift', 'urgent', 'unmeasurable', 'untested'].map((s) => (
           <span key={s} className={`legend-item ${s}`}>{STATUS_TEXT[s].split(':')[0]}</span>
         ))}
       </div>
+      <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
     </section>
   );
 }

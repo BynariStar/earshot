@@ -27,7 +27,7 @@ export default function Spectrum({ id, fault }) {
   const Y = (v) => T + ((hi - v) / (hi - lo)) * (H - T - B);
   return (
     <div className="spectrum">
-      <h4>By pitch {sp.kind === 'nc' ? `(NC-${sp.nc} envelope)` : '(NASA measurement)'}</h4>
+      <h4>By pitch</h4>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Noise level by octave band">
         {[30, 50, 70].map((v) => (
           <g key={v}>
@@ -54,17 +54,22 @@ export default function Spectrum({ id, fault }) {
           );
         })}
       </svg>
-      <p className="small">
-        Mostly reaches the part of your cochlea that hears <strong>{dom.map((d) => bandLabel(d.band)).join(' and ')}</strong>
-        {dom.some((d) => d.tested.length) ? ', pitches Earshot tests.' : '.'}
-      </p>
       {src && (
         <p className="small fault-note">
-          Likely source: <strong>{src.name.toLowerCase()}</strong> ({Math.round(src.confidence * 100)}% of the rise is at {src.bands.map(bandLabel).join(' and ')}). {src.basis}
+          Likely source: <strong>{src.name.toLowerCase()}</strong>. The rise is at {src.bands.map(bandLabel).join(' and ')}.
         </p>
       )}
-      {sourceNote(id) && <p className="muted small">NASA notes: {sourceNote(id)}</p>}
-      {sp.kind === 'nc' && <p className="muted small">NASA gives this module's spectrum only as an image or not at all; the bars show its published NC rating as a curve, the most each band can be.</p>}
+      <p className="small">Loudest for your ears at <strong>{dom.map((d) => bandLabel(d.band)).join(' and ')}</strong>.</p>
+      <details className="source-note">
+        <summary>Source</summary>
+        <p className="muted small">
+          {sp.kind === 'nc'
+            ? `NASA publishes this module's noise only as a rating (NC-${sp.nc}); the dashed bars are that rating's curve, the most each band can be.`
+            : "Read from the figures of NASA's 2024 ISS acoustics report (Allen, ICES-2024-354)."}
+          {src ? ` ${src.basis}` : ''}
+          {sourceNote(id) ? ` NASA notes: ${sourceNote(id)}` : ''}
+        </p>
+      </details>
     </div>
   );
 }

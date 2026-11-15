@@ -7,6 +7,8 @@
 // low-frequency peak (Kibo: 63 Hz). The treadmill is NASA's measured 84.5 dBA at the runner's head.
 // Where an incident is placed somewhere NASA didn't report it, it's marked illustrative.
 import { SIGNATURES, faultDelta } from './spectrum.js';
+import { ISS_PARTS } from './issLayout.js';
+import { BASES } from './bases.js';
 
 const sig = (id) => SIGNATURES.find((s) => s.id === id);
 
@@ -39,9 +41,9 @@ export const INCIDENTS = {
 // The loop, in seconds: incident i starts at `at` and lasts `dur`. Overlaps are deliberate.
 export const CYCLE_S = 120;
 const SCHEDULE = [
-  { i: 0, at: 3, dur: 45 },
-  { i: 1, at: 15, dur: 30 },
-  { i: 2, at: 38, dur: 35 },
+  { i: 0, at: 10, dur: 45 },
+  { i: 1, at: 20, dur: 30 },
+  { i: 2, at: 40, dur: 30 },
   { i: 3, at: 62, dur: 30 },
   { i: 4, at: 85, dur: 30 },
 ];
@@ -85,3 +87,29 @@ export function incidentPitches(inc) {
 }
 
 export const signatureOf = sig;
+
+// ASSUMPTION, stated in the app: Earshot knows which module each crew member is in (from the crew schedule
+// or a worn tag). We don't know of a NASA system that tracks crew location by module; this is simulated.
+// Where the crew member is during the loop: in the first incident's area when it starts, then elsewhere.
+export const LOCATIONS = {
+  iss: [[0, 58, 'node2'], [58, 84, 'node1'], [84, CYCLE_S, 'lab']],
+  moon: [[0, 58, 'm_work'], [58, 84, 'm_crew'], [84, CYCLE_S, 'm_hygiene']],
+  mars: [[0, 58, 'r_work'], [58, CYCLE_S, 'r_lounge']],
+};
+export function whereAt(station, s) {
+  const t = ((s % CYCLE_S) + CYCLE_S) % CYCLE_S;
+  return (LOCATIONS[station] ?? []).find(([a, b]) => t >= a && t < b)?.[2] ?? null;
+}
+
+export function partsOf(station) {
+  return BASES[station] ? BASES[station].parts : ISS_PARTS;
+}
+export const partLabel = (station, id) => partsOf(station).find((p) => p.id === id)?.label ?? id;
+// The module whose NASA spectrum a part's fault is applied to (bases borrow their ISS counterpart's).
+export const spectrumIdOf = (station, id) => (BASES[station] ? BASES[station].parts.find((p) => p.id === id)?.iss ?? id : id);
+
+// An incident in the area where the crew member is right now, or null.
+export function liveHit(station, s) {
+  const here = whereAt(station, s);
+  return liveFrame(station, s).active.find((x) => x.part === here) ?? null;
+}

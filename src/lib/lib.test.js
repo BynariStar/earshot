@@ -305,7 +305,7 @@ describe('active monitoring', () => {
   });
 });
 
-import { liveFrame, incidentPitches, INCIDENTS, CYCLE_S } from './live.js';
+import { liveFrame, incidentPitches, INCIDENTS, CYCLE_S, whereAt, liveHit } from './live.js';
 describe('live feed (simulated)', () => {
   it('replays overlapping incidents on a loop and logs them newest first', () => {
     const f = liveFrame('iss', 20);
@@ -321,11 +321,22 @@ describe('live feed (simulated)', () => {
     expect(incidentPitches(INCIDENTS.iss[3])).toEqual([250, 500, 1000]);
     expect(incidentPitches(INCIDENTS.iss[1])).toEqual([2000, 3000, 4000]);
   });
-  it('an "I was in there" during a live incident raises an exposure alert with a targeted check', () => {
+  it('an incident where the crew member is raises an exposure alert with a targeted check, no question asked', () => {
+    // The simulated crew member is in Node 2 when its fan stalls (10 s into the loop).
+    expect(whereAt('iss', 12)).toBe('node2');
+    const hit = liveHit('iss', 12);
+    expect(hit.part).toBe('node2');
+    expect(liveHit('iss', 5)).toBeNull();
+    // ...and nowhere else in the loop.
+    const hits = new Set();
+    for (let t = 0; t < CYCLE_S; t++) for (const st of ['iss', 'moon', 'mars']) { const h = liveHit(st, t); if (h) hits.add(`${st}:${h.part}`); }
+    expect([...hits].sort()).toEqual(['iss:node2', 'mars:r_work', 'moon:m_work']);
     const data = { tests: [], quick: [] };
-    const a = buildAlerts({ station: 'iss', data, events: [{ type: 'live', where: 'Node 2 (Harmony)', during: 'a stalled ventilation fan', pitches: [500, 1000, 4000], at: 1 }], plan: null, planFlags: [], hearing: null, quick: [] });
+    const a = buildAlerts({ station: 'iss', data, events: [{ type: 'live', where: 'Node 2 (Harmony)', part: 'node2', cause: 'Likely a stalled ventilation fan, +4.8 dBA', pitches: incidentPitches(hit), at: 1 }], plan: null, planFlags: [], hearing: null, quick: [] });
     const ex = a.find((x) => x.id === 'exposure');
-    expect(ex.title).toBe('You were in Node 2 (Harmony) during a stalled ventilation fan');
-    expect(ex.actions[0].to).toBe('quick/live');
+    expect(ex.level).toBe('warn');
+    expect(ex.title).toBe('Node 2 (Harmony) got loud while you were there');
+    expect(ex.body).toContain('500 Hz, 1 kHz and 4 kHz');
+    expect(ex.actions.map((x) => x.to)).toEqual(['quick/live', 'home/node2']);
   });
 });

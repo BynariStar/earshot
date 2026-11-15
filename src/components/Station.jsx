@@ -17,7 +17,7 @@ import { T2 } from '../lib/plan.js';
 import Spectrum from './Spectrum.jsx';
 import { faultDelta } from '../lib/spectrum.js';
 import { STATIONS } from '../lib/session.js';
-import { liveFrame, jitter, incidentDelta, incidentPitches } from '../lib/live.js';
+import { liveFrame, jitter, incidentDelta, whereAt } from '../lib/live.js';
 import { BASES, ATMOSPHERES, EXERCISE_SESSIONS, baseLevel, pressureDelta, SPEC_WORK_DBA, SPEC_SLEEP_DBA } from '../lib/bases.js';
 
 const byId = Object.fromEntries(iss.modules.map((m) => [m.id, m]));
@@ -85,7 +85,7 @@ function Segmented({ value, options, onChange, label }) {
   );
 }
 
-export default function Station({ lockedPlace, demoEvents = [], focus = null, compact = false, onEvent }) {
+export default function Station({ lockedPlace, demoEvents = [], focus = null, compact = false, liveStart: liveStartProp, youStation }) {
   const [place, setPlace] = useState(lockedPlace ?? 'iss');
   const [mode, setMode] = useState(lockedPlace ? 'live' : 'avg');
   const [t, setT] = useState(() => {
@@ -103,13 +103,15 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   const [fans, setFans] = useState('same-mass'); // realistic default: the same air mass must still move
 
   // Live feed clock: seconds since the feed started.
-  const liveStart = useRef(Date.now());
-  const [liveS, setLiveS] = useState(0);
+  const mountedAt = useRef(Date.now());
+  const liveStart = liveStartProp ?? mountedAt.current;
+  const [liveS, setLiveS] = useState(() => (Date.now() - liveStart) / 1000);
   useEffect(() => {
     if (mode !== 'live') return undefined;
-    const id = setInterval(() => setLiveS((Date.now() - liveStart.current) / 1000), 1000);
+    setLiveS((Date.now() - liveStart) / 1000);
+    const id = setInterval(() => setLiveS((Date.now() - liveStart) / 1000), 1000);
     return () => clearInterval(id);
-  }, [mode]);
+  }, [mode, liveStart]);
 
   useEffect(() => {
     if (!playing || mode !== 'now') return undefined;
@@ -156,10 +158,11 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   }, [levels, faultModule]);
   const sel = parts.find((p) => p.id === selected);
   const highlights = [faultModule, ...frame.active.map((x) => x.part)].filter(Boolean);
+  const you = live && youStation === place ? whereAt(place, liveS) : null;
   const nowClock = (secAgo = 0) => new Date(Date.now() - secAgo * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const partLabel = (id) => parts.find((p) => p.id === id)?.label ?? id;
   const selInc = sel && live ? activeOn(sel.id) : null;
-  const incidentBox = selInc ? <LiveIncident inc={selInc} since={nowClock(liveS - selInc.since)} label={sel.label} onEvent={onEvent} /> : null;
+  const incidentBox = selInc ? <LiveIncident inc={selInc} since={nowClock(liveS - selInc.since)} /> : null;
   // The fault shown in a module's spectrum: the demo fault, or a live incident there.
   const faultFor = (id) => {
     if (id === faultModule) return true;
@@ -179,11 +182,6 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
         />
         <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={place === 'chamber' ? [['avg', 'Average'], ['now', 'Over a day']] : [['avg', 'Average'], ['now', 'Over a day'], ['live', 'Live']]} />
       </div>}
-      {lockedPlace && (
-        <div className="station-controls">
-          <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={[['live', 'Live'], ['now', 'Over a day'], ['avg', 'Average']]} />
-        </div>
-      )}
 
       {base && !compact && (
         <div className="station-controls base-controls">
@@ -210,12 +208,6 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
         </div>
       )}
 
-      {live && (
-        <p className="muted provenance small">
-          <span className="live-dot" aria-hidden="true" /> <strong>Live feed, simulated.</strong> NASA doesn't publish live module levels, so this replays a loop of
-          incidents NASA has reported on the ISS (a stalled fan, a faster pump, a low hum) on top of the {place === 'iss' ? 'measured averages' : 'simulated averages'}, to show how Earshot would respond.
-        </p>
-      )}
       {!compact && !live && <p className="muted provenance">
         {place === 'iss' && mode === 'avg' && "NASA's measured average for each module (Allen 2024, ICES-2024-354). Grey: no dBA value published (Unity and the Quest airlock are reported only as meeting NASA's NC-50 limit)."}
         {place === 'iss' && mode === 'now' && 'Simulated day. NASA publishes module averages, not live levels. Fans and pumps run around the clock, so modules change little hour to hour; the big swings come from crew activities. This day adds two treadmill hours and a sleep period to the measured averages.'}
@@ -243,58 +235,71 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           camera={base ? base.camera : place === 'iss' ? [52, 40, 66] : [13, 11, 15]}
           target={base ? base.target : place === 'iss' ? [-5, -3, 0] : [0, 3, 0]}
           highlight={live ? highlights : faultModule ?? (base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined)}
+          you={you}
         />
-        <aside className="station-panel">
-          {!live && events.map((e) => <p key={e.text} className="event">{e.text}</p>)}
-          {frame.active.filter((inc) => inc.part !== selected).map((inc) => {
+        <div className="legend-bar" aria-label="Colour key">
+          {NOISE_BINS.map((b) => (
+            <span key={b.label}><i style={{ background: b.color }} />{b.label.replace(' (sleep target)', '')}</span>
+          ))}
+          {place !== 'chamber' && <span><i style={{ background: NO_DATA_COLOR }} />no value</span>}
+        </div>
+      </div>
+
+      <div className="station-below">
+        {live && (
+          <p className="muted small live-note">
+            <span className="live-dot" aria-hidden="true" /> Simulated live feed: faults NASA has reported on the ISS, on a loop. Earshot assumes it knows which module you're in.
+          </p>
+        )}
+        <ul className="now-list">
+          {you && (
+            <li className="you-row">
+              <span className="you-dot" aria-hidden="true" />
+              You are in <button className="link-button inline-link" onClick={() => pick(you)}>{partLabel(you)}</button>
+            </li>
+          )}
+          {!live && events.map((e) => <li key={e.text}><span className="event-dot" aria-hidden="true" />{e.text}</li>)}
+          {frame.active.map((inc) => {
             const d = levels[inc.part] - baseLv[inc.part];
             return (
-              <button key={inc.key} className="event event-alert" onClick={() => pick(inc.part)}>
-                <span className="event-dot" aria-hidden="true" />
-                <span>
-                  <strong>{partLabel(inc.part)}: {inc.what}</strong>
-                  <span className="event-sub">{inc.kind === 'activity' ? `${levels[inc.part].toFixed(1)} dBA` : `+${d.toFixed(1)} dBA`} · since {nowClock(liveS - inc.since)}</span>
-                  <span className="event-cta">{inc.kind === 'activity' ? 'See the level ›' : 'See the likely source ›'}</span>
-                </span>
-              </button>
+              <li key={inc.key}>
+                <button className={`now-row${inc.part === selected ? ' on' : ''}`} onClick={() => pick(inc.part)}>
+                  <span className="event-dot" aria-hidden="true" />
+                  <strong>{partLabel(inc.part)}</strong> {inc.what}, {inc.kind === 'activity' ? `${levels[inc.part].toFixed(1)} dBA` : `+${d.toFixed(1)} dBA`}
+                  <span className="muted"> · since {nowClock(liveS - inc.since)}</span>
+                </button>
+              </li>
             );
           })}
-          {faultModule && selected !== faultModule && (
-            <button className="event event-alert" onClick={() => pick(faultModule)}>
-              <span className="event-dot" aria-hidden="true" />
-              <span>
-                <strong>{STATIONS[place].faultName} is {faultDelta(faultModule).toFixed(1)} dBA louder than normal</strong>
-                <span className="event-cta">See the likely source ›</span>
-              </span>
-            </button>
+          {faultModule && (
+            <li>
+              <button className={`now-row${faultModule === selected ? ' on' : ''}`} onClick={() => pick(faultModule)}>
+                <span className="event-dot" aria-hidden="true" />
+                <strong>{STATIONS[place].faultName}</strong> louder than normal, +{faultDelta(faultModule).toFixed(1)} dBA
+              </button>
+            </li>
           )}
-          {sel && base ? (
-            <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} atm={atm} basis={basis} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
-          ) : sel ? (
-            <ModuleDetail part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} />
-          ) : (
-            <p className="muted">Drag to turn, pinch or scroll to zoom, and tap {place === 'chamber' ? 'a floor' : place === 'iss' ? 'a module' : 'an area'} for details.</p>
-          )}
-          {live && frame.log.length > 0 && (
-            <div className="live-log">
-              <h4>Feed</h4>
-              <ul>
-                {frame.log.map((e) => (
-                  <li key={`${e.key}-${e.type}`} className={e.type}>
-                    <span className="muted">{nowClock(liveS - e.at)}</span>{' '}
-                    <button className="link-button inline-link" onClick={() => pick(e.inc.part)}>{partLabel(e.inc.part)}</button>: {e.type === 'start' ? e.inc.what : `${e.inc.fix}, back to normal`}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="legend3d">
-            {NOISE_BINS.map((b) => (
-              <span key={b.label}><i style={{ background: b.color }} />{b.label}</span>
-            ))}
-            {place !== 'chamber' && <span><i style={{ background: NO_DATA_COLOR }} />No value</span>}
+        </ul>
+        {sel && base ? (
+          <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} atm={atm} basis={basis} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
+        ) : sel ? (
+          <ModuleDetail part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} />
+        ) : (
+          <p className="muted small">Tap {place === 'chamber' ? 'a floor' : place === 'iss' ? 'a module' : 'an area'} to see its noise by pitch.</p>
+        )}
+        {live && !compact && frame.log.length > 0 && (
+          <div className="live-log">
+            <h4>Feed</h4>
+            <ul>
+              {frame.log.map((e) => (
+                <li key={`${e.key}-${e.type}`} className={e.type}>
+                  <span className="muted">{nowClock(liveS - e.at)}</span>{' '}
+                  <button className="link-button inline-link" onClick={() => pick(e.inc.part)}>{partLabel(e.inc.part)}</button>: {e.type === 'start' ? e.inc.what : `${e.inc.fix}, back to normal`}
+                </li>
+              ))}
+            </ul>
           </div>
-        </aside>
+        )}
       </div>
 
       {place === 'chamber' && <ChamberChart floor={selected ? Number(selected.replace('floor', '')) : 1} t={mode === 'now' ? t : null} />}
@@ -312,21 +317,13 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   );
 }
 
-// A live incident in the selected area: what happened, and "I was in there" to start a targeted check.
-function LiveIncident({ inc, since, label, onEvent }) {
-  const [told, setTold] = useState(false);
-  const pitches = incidentPitches(inc);
+// A live incident in the selected area: what happened and since when.
+function LiveIncident({ inc, since }) {
   return (
-    <div className="live-incident">
-      <p><strong>{inc.what[0].toUpperCase() + inc.what.slice(1)}</strong> since {since}.{inc.illustrative ? ' Illustrative: NASA reported this fault elsewhere on the ISS.' : ''}</p>
-      {onEvent && (told ? (
-        <p className="small">Noted. Earshot added a quick check to your home screen.</p>
-      ) : (
-        <button className="secondary" onClick={() => { onEvent({ type: 'live', where: label, what: inc.what, during: inc.during, pitches }); setTold(true); }}>
-          I was in there
-        </button>
-      ))}
-    </div>
+    <p className="live-incident">
+      <span className="event-dot" aria-hidden="true" />
+      {inc.what[0].toUpperCase() + inc.what.slice(1)} since {since}.{inc.illustrative ? ' (Illustrative: NASA reported this fault elsewhere on the ISS.)' : ''}
+    </p>
   );
 }
 

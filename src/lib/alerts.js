@@ -22,13 +22,16 @@ export function quickPitchesFor(event) {
   return [2000, 3000, 4000]; // loud exposure, e.g. treadmill without earplugs
 }
 
+const listJoin = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
+// Levels: 'urgent' and 'warn' open full screen once (act now); 'info' goes to the bell.
 export function buildAlerts({ station, data, events, plan, planFlags, hearing, quick }) {
   const st = STATIONS[station];
   const out = [];
   const check = latestCheck(data);
   const sudden = check?.confirmedFindings?.find((f) => f.kind === 'sudden');
   if (sudden) {
-    out.push({ id: 'sudden', level: 'urgent', title: `Sudden drop in your ${sudden.ear} ear`, body: 'Time-sensitive. Tell your crew medical officer now and open the response: onset, hum test, summary for the flight surgeon.', actions: [{ label: 'Open the response', to: 'ears/sudden' }] });
+    out.push({ id: 'sudden', level: 'urgent', title: `Sudden drop in your ${sudden.ear} ear`, body: 'Tell your crew medical officer now. Treatment works best when it starts early.', actions: [{ label: 'Open the response', to: 'ears/sudden' }] });
   }
 
   const lastQuick = quick?.[0];
@@ -39,7 +42,7 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
 
   if (ringing) {
     const done = lastQuick && lastQuick.at > ringing.at;
-    if (!done) out.push({ id: 'ringing', level: 'urgent', title: `Ringing in your ${ringing.ear ?? 'right'} ear`, body: 'Take a 2-minute check now, before anything else: 1 to 4 kHz, both ears.', actions: [{ label: 'Quick check now', to: 'quick/ringing' }] });
+    if (!done) out.push({ id: 'ringing', level: 'urgent', title: `Ringing in your ${ringing.ear ?? 'right'} ear`, body: 'Check your hearing now: 2 minutes, 1 to 4 kHz, both ears.', actions: [{ label: 'Quick check now', to: 'quick/ringing' }] });
   }
 
   if (fault) {
@@ -47,9 +50,9 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
     out.push({
       id: 'fault',
       level: 'warn',
-      title: `${st.faultName} is louder than normal: +${FAULT_RISE_DB} dB at ${sig.bands.map(bandLabel).join(' and ')} (+${faultDelta(st.faultModule).toFixed(1)} dBA overall)`,
-      body: `Likely source: ${sig.name.toLowerCase()}. ${sig.basis} Wear earplugs while you're there. A noise-only report went to the ground.`,
-      actions: [{ label: 'Show on the map', to: `home/${st.faultModule}` }, ...(events.some((e) => e.type === 'was-there') ? [] : [{ label: 'I was in there', event: { type: 'was-there' } }]), { label: 'Plan around it', to: 'plan' }],
+      title: `${st.faultName} is louder than normal`,
+      body: `Likely a ${sig.name.toLowerCase()} (+${faultDelta(st.faultModule).toFixed(1)} dBA, louder at ${listJoin(sig.bands.map(bandLabel))}). Wear earplugs there until it's fixed.`,
+      actions: [{ label: 'Show on the map', to: `home/${st.faultModule}` }, { label: 'Plan around it', to: 'plan' }],
     });
   }
 
@@ -62,24 +65,24 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
       out.push({
         id: 'exposure',
         level: 'warn',
-        title: loud ? 'Loud exposure today: treadmill without earplugs' : exposure === live ? `You were in ${live.where} during ${live.during}` : `You spent time in ${st.faultName} during the fault`,
-        body: `Take a 2-minute check tonight at ${pitches.map(bandLabel).join(', ')}: the pitches that noise reaches. A change right after noise can be temporary, so Earshot rechecks tomorrow.`,
-        actions: [{ label: 'Quick check', to: `quick/${exposure.type}` }],
+        title: loud ? 'Treadmill without earplugs' : exposure === live ? `${live.where} got loud while you were there` : `You were in ${st.faultName} during the fault`,
+        body: `${exposure === live ? `${live.cause}. ` : ''}Check your hearing tonight: 2 minutes at ${listJoin(pitches.map(bandLabel))}, the pitches this noise reaches. A change right after noise may be temporary; Earshot rechecks tomorrow.`,
+        actions: [{ label: 'Quick check', to: `quick/${exposure.type}` }, ...(exposure === live && live.part ? [{ label: 'Show on the map', to: `home/${live.part}` }] : [])],
       });
     }
   }
 
   if (lastQuick) {
-    if (lastQuick.worst >= 30) out.push({ id: 'q30', level: 'urgent', title: `Quick check: ${lastQuick.worst} dB drop at ${bandLabel(lastQuick.worstAt)}`, body: 'Possible sudden drop. Run the full check now to confirm.', actions: [{ label: 'Full check now', to: 'test/check' }] });
-    else if (lastQuick.worst >= 10) out.push({ id: 'q10', level: 'warn', title: `Quick check: ${lastQuick.worst} dB worse at ${bandLabel(lastQuick.worstAt)}`, body: 'Often temporary after loud noise. Protect your ears today, keep tonight quiet, and recheck tomorrow; if it stays, Earshot runs the full check.', actions: [{ label: 'See my ears', to: 'ears' }] });
-    else out.push({ id: 'q0', level: 'ok', title: 'Quick check: no change', body: `Within ${lastQuick.worst} dB of your baseline at the pitches tested.`, actions: [] });
+    if (lastQuick.worst >= 30) out.push({ id: 'q30', level: 'urgent', title: `Quick check: ${lastQuick.worst} dB drop at ${bandLabel(lastQuick.worstAt)}`, body: 'This could be a sudden drop. Run the full check now to confirm.', actions: [{ label: 'Full check now', to: 'test/check' }] });
+    else if (lastQuick.worst >= 10) out.push({ id: 'q10', level: 'info', title: `Quick check: ${lastQuick.worst} dB worse at ${bandLabel(lastQuick.worstAt)}`, body: 'Often temporary after noise. Keep tonight quiet; Earshot rechecks tomorrow.', actions: [{ label: 'See my ears', to: 'ears' }] });
+    else out.push({ id: 'q0', level: 'info', title: 'Quick check: no change', body: `Every pitch within ${lastQuick.worst} dB of your baseline.`, actions: [] });
   }
 
   if (planFlags?.length) {
-    out.push({ id: 'flags', level: 'info', title: `Today's plan: earplugs for ${planFlags.map((f) => f.name).join(', ')}`, body: 'Flagged automatically from NASA’s rules and your own hearing checks.', actions: [{ label: 'Plan my day', to: 'plan' }] });
+    out.push({ id: 'flags', level: 'info', title: `Earplugs today: ${listJoin(planFlags.map((f) => f.name))}`, body: hearing && hearing.state !== 'none' && hearing.state !== 'steady' ? "From NASA's noise limits and your last hearing check." : "From NASA's noise limits.", actions: [{ label: 'Plan my day', to: 'plan' }] });
   }
-  if (hearing?.state === 'high') out.push({ id: 'targets', level: 'info', title: 'Stricter noise targets are on for your ears', body: 'Your last check shows a small change at the pitches noise affects.', actions: [{ label: 'See my ears', to: 'ears' }] });
-  if (baselineTests(data).length < 2) out.push({ id: 'baseline', level: 'info', title: 'Set your baseline', body: 'Two short tests on your own headphones; everything else builds on them.', actions: [{ label: 'Start', to: 'test/baseline' }] });
+  if (hearing?.state === 'high') out.push({ id: 'targets', level: 'info', title: 'Stricter noise targets', body: 'Your last check shows a small change at high pitches.', actions: [{ label: 'See my ears', to: 'ears' }] });
+  if (baselineTests(data).length < 2) out.push({ id: 'baseline', level: 'info', title: 'Set your baseline', body: 'Two 8-minute tests on your own headphones. Every later check compares against them.', actions: [{ label: 'Start', to: 'test/baseline' }] });
 
   const order = { urgent: 0, warn: 1, info: 2, ok: 3 };
   return out.sort((a, b) => order[a.level] - order[b.level]);

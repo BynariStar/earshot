@@ -20,6 +20,8 @@ import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/sess
 import { personaById, simulatedThresholds } from './lib/personas.js';
 import { hearingState, TARGETS } from './lib/personal.js';
 import { buildAlerts } from './lib/alerts.js';
+import { liveHit, incidentPitches, incidentDelta, partLabel, spectrumIdOf } from './lib/live.js';
+import About from './components/About.jsx';
 import { evaluate, averageBaselines } from './lib/rules.js';
 import './App.css';
 
@@ -42,11 +44,14 @@ function useRoute() {
   return [route, go];
 }
 
-const TITLES = { ears: 'My ears', station: 'Station noise', plan: 'Plan my day', test: 'Hearing test', quick: 'Quick check' };
+const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Plan my day', test: 'Hearing test', quick: 'Quick check', about: 'How Earshot works' };
+const APP_START = Date.now();
 
 function dataFor(personaId) {
   if (personaId === 'own') return load();
-  return loadSim(personaId) ?? { ...personaById(personaId).state(), quick: [] };
+  const p = personaById(personaId);
+  const d = loadSim(personaId) ?? { ...p.state(), quick: [] };
+  return { ...d, profile: { ...(d.profile ?? {}), age: p.age, sex: p.sex } };
 }
 
 export default function App() {
@@ -61,6 +66,12 @@ export default function App() {
     setSessionState(s);
     saveSession(s);
   };
+  const changeSession = (fn) =>
+    setSessionState((prev) => {
+      const next = fn(prev);
+      saveSession(next);
+      return next;
+    });
   const persist = (next) => {
     if (!session || session.persona === 'own') save(next);
     else saveSim(session.persona, next);
@@ -83,19 +94,35 @@ export default function App() {
     return { ...p, base: session.station, places: [], fill: DEFAULT_FILL[session.station], sleepAt: DEFAULT_SLEEP[session.station] };
   }, [plan, session]);
 
-  // The "Is this normal?" noise comparison reads the planned day.
-  useEffect(() => {
-    const { work } = computePlan(effectivePlan);
-    try {
-      localStorage.setItem('earshot.plannedDay', JSON.stringify({ leqDba: work.leqDba, status: work.status }));
-    } catch {
-      /* storage unavailable */
-    }
-  }, [effectivePlan]);
-
   const hearing = hearingState(data);
   const flags = applyFlags(effectivePlan, TARGETS[hearing.state].protectAbove);
   const planResult = computePlan(flags.plan);
+  // My ears' "could noise explain it?" reads the planned day, with the earplugs Earshot flagged.
+  useEffect(() => {
+    try {
+      localStorage.setItem('earshot.plannedDay', JSON.stringify({ leqDba: planResult.work.leqDba, status: planResult.work.status }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [planResult.work.leqDba, planResult.work.status]);
+
+  // Live feed: one clock per session, so it keeps running while you're on other pages. Earshot is assumed to
+  // know where the crew member is (simulated); an incident in their area raises an exposure alert by itself.
+  const liveStart = session?.liveStart ?? APP_START;
+  useEffect(() => {
+    if (!session) return undefined;
+    const id = setInterval(() => {
+      if ((session.events ?? []).some((e) => e.type === 'live')) return;
+      const hit = liveHit(session.station, (Date.now() - liveStart) / 1000);
+      if (!hit) return;
+      const delta = incidentDelta(hit, spectrumIdOf(session.station, hit.part));
+      const cause = hit.kind === 'fault' ? `Likely ${hit.during}, +${delta.toFixed(1)} dBA` : `${hit.during[0].toUpperCase()}${hit.during.slice(1)}`;
+      const e = { type: 'live', part: hit.part, where: partLabel(session.station, hit.part), cause, pitches: incidentPitches(hit), at: Date.now() };
+      changeSession((prev) => ({ ...prev, events: [...(prev.events ?? []).filter((x) => x.type !== 'live'), e] }));
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.station, session?.events, liveStart]);
   const alerts = session
     ? buildAlerts({ station: session.station, data, events: session.events ?? [], plan: planResult, planFlags: flags.flagged, hearing, quick: data.quick ?? [] })
     : [];
@@ -103,7 +130,7 @@ export default function App() {
   // A new urgent or warning alert opens full screen once (not during a test, and not on the page it points to).
   const alertKey = (a) => `${a.id}:${a.title}`;
   const seen = session?.seen ?? [];
-  const busy = section === 'test' || section === 'quick' || section === 'welcome';
+  const busy = section === 'test' || section === 'quick' || section === 'welcome' || route === 'ears/sudden';
   const pageAlert = busy
     ? null
     : alerts.find((a) => (a.level === 'urgent' || a.level === 'warn') && !seen.includes(alertKey(a)) && !a.actions.some((x) => x.to && x.to === route));
@@ -121,15 +148,15 @@ export default function App() {
   const overlay = pageAlert && <AlertPage alert={pageAlert} onAct={(x) => actOnAlert(pageAlert, x)} onDismiss={() => dismissAlert(pageAlert)} />;
 
   function start(s) {
-    setSession(s);
+    setSession({ ...s, seen: [], liveStart: Date.now() });
     setData(dataFor(s.persona));
     go('');
   }
   function addEvent(e) {
-    setSession({ ...session, events: [...(session.events ?? []).filter((x) => x.type !== e.type), { ...e, at: Date.now() }] });
+    changeSession((prev) => ({ ...prev, events: [...(prev.events ?? []).filter((x) => x.type !== e.type), { ...e, at: Date.now() }] }));
   }
   function clearEvents() {
-    setSession({ ...session, events: [], seen: [] });
+    setSession({ ...session, events: [], seen: [], liveStart: Date.now() });
     if (persona) {
       clearSim(session.persona);
       setData(dataFor(session.persona));
@@ -171,7 +198,7 @@ export default function App() {
           onClearEvents={clearEvents}
           onChange={() => go('welcome')}
           data={data}
-          onReset={() => setData(dataFor(session.persona))}
+          liveStart={liveStart}
         />
         <Footer />
         {overlay}
@@ -182,7 +209,7 @@ export default function App() {
   const back = section === 'test' ? () => go('ears') : () => go('');
   const earsTab = section === 'ears' ? sub || 'overview' : null;
   const hasSudden = latestCheck(data)?.confirmedFindings?.some((f) => f.kind === 'sudden');
-  const earsTabs = [['overview', 'Overview'], ['tests', 'My tests'], ['normal', 'Is this normal?']];
+  const earsTabs = [['overview', 'Overview'], ['tests', 'My tests']];
   if (hasSudden || earsTab === 'sudden') earsTabs.push(['sudden', 'Sudden drop: act now']);
 
   return (
@@ -192,7 +219,7 @@ export default function App() {
           <span aria-hidden="true">‹</span>
         </button>
         <h1>{TITLES[section]}</h1>
-        {section === 'ears' && <span className="badge personal">{persona ? `${persona.name} · simulated` : 'Personal'}</span>}
+        {section === 'ears' && persona && <span className="muted appbar-sub">{persona.name} (simulated)</span>}
       </header>
 
       {section === 'ears' && (
@@ -207,7 +234,7 @@ export default function App() {
 
       <main>
         {earsTab === 'overview' && (
-          <Home data={data} onStartTest={startTest} onOpenNormal={() => go('ears/normal')} onOpenSudden={() => go('ears/sudden')} onExitDemo={() => go('welcome')} />
+          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} />
         )}
         {earsTab === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={startTest} />}
         {earsTab === 'sudden' && <SuddenResponse data={data} onRetest={() => go('quick/ringing')} />}
@@ -216,9 +243,10 @@ export default function App() {
         {section === 'quick' && <QuickCheck key={sub} kind={sub || 'general'} data={data} persona={persona} events={session.events ?? []} onSave={saveQuick} onSimulatedFullCheck={simulatedFullCheck} go={go} />}
         {section === 'station' && (
           <Suspense fallback={<p className="muted">Loading the station…</p>}>
-            <Station demoEvents={session.events ?? []} />
+            <Station demoEvents={session.events ?? []} liveStart={liveStart} youStation={session.station} />
           </Suspense>
         )}
+        {section === 'about' && <About data={data} onReset={() => setData(dataFor(session.persona))} />}
         {section === 'plan' && <Planner plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} />}
       </main>
       <Footer />

@@ -9,7 +9,7 @@
 import data from '../data/spectra.json';
 
 export const BANDS = data.bands;
-const A_WEIGHT = [-26.2, -16.1, -8.6, -3.2, 0, 1.2, 1.0, -1.1];
+export const A_WEIGHT = [-26.2, -16.1, -8.6, -3.2, 0, 1.2, 1.0, -1.1];
 const NC_TABLE = {
   15: [47, 36, 29, 22, 17, 14, 12, 11],
   20: [51, 40, 33, 26, 22, 19, 17, 16],

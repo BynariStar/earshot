@@ -6,6 +6,8 @@
 import { latestCheck, baselineTests } from './storage.js';
 import { STATIONS } from './session.js';
 import { SIGNATURES, bandLabel, faultDelta } from './spectrum.js';
+import { protectorFor, PROTECTORS, watchPitches, signatureReaches, levelReaching, REACH_DBA, reachLabel, trendFor } from './protect.js';
+import { spectrumIdOf, partLabel, shortPart } from './live.js';
 
 export const FAULT_SIGNATURE = 'stalled-fan';
 export const FAULT_RISE_DB = 8; // band rise used in the demo fault
@@ -31,6 +33,8 @@ const listJoin = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(
 export function buildAlerts({ station, data, events, plan, quick, schedule = [], nowMin = null }) {
   const st = STATIONS[station];
   const out = [];
+  const watch = watchPitches(data)[0] ?? null; // the crew member's weakest pitch, if any
+  const watchLine = (reaches) => (watch && reaches ? ` It peaks just below your ${watch.ear} ear's ${bandLabel(watch.f)}, which is on watch.` : '');
   const check = latestCheck(data);
   const sudden = check?.confirmedFindings?.find((f) => f.kind === 'sudden');
   if (sudden) {
@@ -50,26 +54,29 @@ export function buildAlerts({ station, data, events, plan, quick, schedule = [],
 
   if (fault) {
     const sig = SIGNATURES.find((s) => s.id === FAULT_SIGNATURE);
+    const prot = protectorFor(spectrumIdOf(station, st.faultModule), { signature: FAULT_SIGNATURE, rise: FAULT_RISE_DB });
     out.push({
       id: 'fault',
       level: 'warn',
       popup: true,
       dismissable: true,
       title: `${st.faultName} is louder than normal`,
-      body: `Likely a ${sig.name.toLowerCase()} (+${faultDelta(st.faultModule).toFixed(1)} dBA, louder at ${listJoin(sig.bands.map(bandLabel))}). Wear earplugs there until it's fixed.`,
+      body: `Likely a ${sig.name.toLowerCase()} (+${faultDelta(st.faultModule).toFixed(1)} dBA, louder at ${listJoin(sig.bands.map(bandLabel))}). Wear ${prot.noun} there until it's fixed.${watchLine(watch && signatureReaches(FAULT_SIGNATURE, watch.f))}`,
       actions: [{ label: 'Show on the map', to: `home/${st.faultModule}` }, { label: 'Plan around it', to: 'plan' }],
     });
   }
 
   // Proactive popup: only "wear earplugs" and where the noise comes from. The hearing check goes to the bell.
   if (live) {
+    const prot = live.kind === 'fault' ? protectorFor(live.spectrumId, { signature: live.signature, rise: live.rise }) : { ...PROTECTORS.foam, basis: 'default' };
+    const reaches = watch && (live.kind === 'fault' ? signatureReaches(live.signature, watch.f) : watch.f >= 2000);
     out.push({
       id: 'live-earplugs',
       level: 'warn',
       popup: true,
       dismissable: true,
-      title: `${live.where} got loud: wear earplugs there`,
-      body: `${live.cause}. You were in ${live.where} when it started. Wear earplugs there until it's fixed.`,
+      title: `${live.where} got loud: wear ${prot.noun} there`,
+      body: `${live.cause}. You were in ${live.where} when it started. Wear ${prot.noun} there until it's fixed.${prot.id === 'anr' ? ' Most of this noise is low-pitched, where foam earplugs block least.' : ''}${watchLine(reaches)}`,
       actions: live.part ? [{ label: 'Show the source', to: `home/${live.part}` }] : [],
     });
   }
@@ -100,10 +107,27 @@ export function buildAlerts({ station, data, events, plan, quick, schedule = [],
   if (nowMin !== null) {
     const next = schedule.find((s) => s.protectedNow && s.start > nowMin && s.start - nowMin <= 15);
     if (next) {
-      const name = next.name.replace(' (earplugs)', '').replace(/^.*\((.*)\)$/, '$1');
+      const name = shortPart(next.name);
       const hhmm = `${String(Math.floor(next.start / 60)).padStart(2, '0')}:${String(next.start % 60).padStart(2, '0')}`;
-      out.push({ id: `ahead-${next.id}`, level: 'warn', popup: true, dismissable: true, title: `Earplugs for ${name} at ${hhmm}`, body: `Next on your schedule: ${name}, ${next.rawDba} dBA, for ${next.minutes >= 60 ? `${next.minutes / 60} h` : `${next.minutes} min`}.`, actions: [{ label: 'See today', to: 'plan' }] });
+      const prot = next.placeId ? protectorFor(spectrumIdOf(station, next.placeId)) : PROTECTORS.foam;
+      out.push({ id: `ahead-${next.id}`, level: 'warn', popup: true, dismissable: true, title: `${prot.short} for ${name} at ${hhmm}`, body: `Next on your schedule: ${name}, ${next.rawDba} dBA, for ${next.minutes >= 60 ? `${next.minutes / 60} h` : `${next.minutes} min`}.`, actions: [{ label: 'See today', to: 'plan' }] });
     }
+  }
+  // Early warning (simulated trend): a module creeping louder over days, before it becomes a fault.
+  const trend = trendFor(station);
+  if (trend) {
+    const where = partLabel(station, trend.part);
+    const prot = protectorFor(trend.spectrumId, { signature: trend.signature, rise: trend.rise });
+    const sig = SIGNATURES.find((x) => x.id === trend.signature);
+    const reaches = watch && (signatureReaches(trend.signature, watch.f) || (levelReaching(trend.spectrumId, watch.f) ?? 0) >= REACH_DBA);
+    out.push({
+      id: 'trend',
+      level: 'warn',
+      dismissable: true,
+      title: `${shortPart(where)} is getting louder`,
+      body: `+${trend.rise.toFixed(1)} dBA over ${trend.span} days, mostly at ${listJoin(sig.bands.map(bandLabel))}: often a ${sig.name.toLowerCase().replace('stalled ', '')} wearing out. Wear ${prot.noun} there until it's checked.${reaches ? ` It reaches ${reachLabel(watch.f)}, just below your ${bandLabel(watch.f)} on watch.` : ''}`,
+      actions: [{ label: 'Show on the map', to: `home/${trend.part}` }],
+    });
   }
   // Earplug flags and stricter targets are recommendations, shown on Today, not alerts.
   if (baselineTests(data).length < 2) out.push({ id: 'baseline', level: 'info', title: 'Set your baseline', body: 'Two 8-minute tests on your own headphones. Every later check compares against them.', actions: [{ label: 'Start', to: 'test/baseline' }] });

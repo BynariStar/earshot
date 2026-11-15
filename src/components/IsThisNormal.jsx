@@ -5,6 +5,7 @@ import { averageBaselines, shifts } from '../lib/rules.js';
 import { baselineTests, latestCheck } from '../lib/storage.js';
 import { compareAll, contextInputs } from '../lib/context.js';
 import { explain } from '../lib/advice.js';
+import Info from './Info.jsx';
 
 const BAND_LABEL = { low: 'low pitches (250-500 Hz)', high: 'high pitches (2-4 kHz)' };
 
@@ -79,6 +80,50 @@ export default function IsThisNormal({ data, onStartTest }) {
         </p>
       )}
     </section>
+  );
+}
+
+// The same comparison as a compact list for the flyout on My ears: question, verdict, the numbers behind "?".
+export function NormalList({ data }) {
+  const baselines = baselineTests(data);
+  const check = latestCheck(data);
+  if (baselines.length < 2 || !check) return <p className="muted">Needs your baseline and at least one check.</p>;
+  const reference = averageBaselines(baselines[0].thresholds, baselines[1].thresholds);
+  const s = shifts(reference, check.thresholds);
+  const inputs = contextInputs(data);
+  const confirmed = (check.confirmedFindings ?? []).filter((f) => f.kind !== 'sudden');
+  let sub = confirmed[0] ? { ear: confirmed[0].ear, band: confirmed[0].kind, change: confirmed[0].averageDb } : null;
+  if (!sub) {
+    const all = [];
+    for (const ear of ['left', 'right']) for (const band of ['low', 'high']) if (Number.isFinite(s[ear][band])) all.push({ ear, band, change: s[ear][band] });
+    sub = all.sort((a, b) => b.change - a.change)[0];
+  }
+  if (!sub) return <p className="muted">No change to compare.</p>;
+  const within = sub.change < 10; // NASA counts 10 dB as a shift; under it, the other rows are context only
+  const rows = compareAll(sub.change, sub.band, inputs).map((r) => (within && r.id !== 'error' ? { ...r, level: 'none' } : r));
+  const icon = { ok: '✓', watch: '◐', flag: '!', none: '·' };
+  return (
+    <div className="normal-list">
+      <p className="muted">
+        Your {sub.ear} ear, {BAND_LABEL[sub.band]}: {sub.change >= 0 ? '+' : ''}{sub.change.toFixed(1)} dB on average from your baseline. Checked against NASA and Canadian Space Agency data{within ? '. It is within test error, so the rest is context, not a finding' : ''}:
+      </p>
+      <ul className="nl-rows">
+        {rows.map((r) => (
+          <li key={r.id} className={`nl-row ${r.level}`}>
+            <span className={`nl-icon ${r.level}`} aria-hidden="true">{icon[r.level] ?? '–'}</span>
+            <div>
+              <strong>{r.question}</strong>
+              <p className="nl-verdict">
+                {r.verdict}
+                <Info>{`${r.detail ? `${r.detail} ` : ''}Source: ${r.source}.`}</Info>
+              </p>
+              {r.id === 'cognition' && r.series && <Spark series={r.series} base={r.base} />}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {data.cognition?.length > 0 && <p className="muted small">The auditory-task history is the real record of one CSA PRET volunteer (2015), paired with this simulated hearing record.</p>}
+    </div>
   );
 }
 

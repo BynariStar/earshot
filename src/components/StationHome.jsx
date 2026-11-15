@@ -2,6 +2,7 @@
 // Reviewed and directed by the team. See AI_USE.md.
 // Home: the live station map. Navigation and alerts live in the bottom tab bar; the header holds only the
 // station, who you are, and the presenter's Demo controls and menu.
+import { watchPitches } from '../lib/protect.js';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { STATIONS } from '../lib/session.js';
 import { partsOf } from '../lib/live.js';
@@ -14,7 +15,7 @@ const DEMO_EVENTS = [
   { type: 'ringing', symptom: 'ringing', label: 'Report ringing in the right ear', ear: 'right' },
 ];
 
-export default function StationHome({ session, persona, focus, onEvent, onClearEvents, onChange, liveStart, pausedAt, onTogglePause, onMoveMe }) {
+export default function StationHome({ session, persona, data, focus, onEvent, onClearEvents, onChange, liveStart, pausedAt, onTogglePause, onMoveMe }) {
   const st = STATIONS[session.station];
   const [sheet, setSheet] = useState(null); // 'demo' | 'move'
   // P pauses or plays the simulated feed (for presenting).
@@ -34,7 +35,7 @@ export default function StationHome({ session, persona, focus, onEvent, onClearE
       </button>
 
       <Suspense fallback={<p className="muted">Loading the station…</p>}>
-        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact liveStart={liveStart} pausedAt={pausedAt} onTogglePause={onTogglePause} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={onMoveMe} />
+        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact liveStart={liveStart} pausedAt={pausedAt} onTogglePause={onTogglePause} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={onMoveMe} watch={data ? watchPitches(data)[0] ?? null : null} />
       </Suspense>
 
       {sheet === 'demo' && (

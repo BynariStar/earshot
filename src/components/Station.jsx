@@ -19,7 +19,8 @@ import Info from './Info.jsx';
 import Picker from './Picker.jsx';
 import { faultDelta } from '../lib/spectrum.js';
 import { STATIONS } from '../lib/session.js';
-import { liveFrame, jitter, incidentDelta, whereAt, signatureOf } from '../lib/live.js';
+import { liveFrame, jitter, incidentDelta, whereAt, signatureOf, spectrumIdOf, shortPart } from '../lib/live.js';
+import { protectorFor, protectorWhy, levelReaching, reachLabel, REACH_DBA, trendFor } from '../lib/protect.js';
 import { BASES, ATMOSPHERES, EXERCISE_SESSIONS, baseLevel, SPEC_WORK_DBA, SPEC_SLEEP_DBA } from '../lib/bases.js';
 
 // A word for each colour band, so level never depends on colour alone.
@@ -89,7 +90,7 @@ function Segmented({ value, options, onChange, label }) {
   );
 }
 
-export default function Station({ lockedPlace, demoEvents = [], focus = null, compact = false, liveStart: liveStartProp, pausedAt = null, onTogglePause, youStation, youAt = null, onMoveMe }) {
+export default function Station({ lockedPlace, demoEvents = [], focus = null, compact = false, liveStart: liveStartProp, pausedAt = null, onTogglePause, youStation, youAt = null, onMoveMe, watch = null }) {
   const [place, setPlace] = useState(lockedPlace ?? 'iss');
   const [mode, setMode] = useState(lockedPlace ? 'live' : 'avg');
   const [t, setT] = useState(() => {
@@ -188,13 +189,16 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   // The panel: "Now" in live view (or during a demo fault), a module's details when one is selected.
   const showPanel = !!sel || live || !!faultModule;
   // Callouts: a small label above each module with something happening now; tapping one opens its details.
-  const shortLabel = (id) => partLabel(id).replace(/^Level \d · /, '').replace(/^.*\((.*)\)$/, '$1');
+  const shortLabel = (id) => shortPart(partLabel(id));
+  // Early warning (simulated): one module creeping louder over days. Shown on the home map only.
+  const trend = lockedPlace && place === lockedPlace ? trendFor(place) : null;
   const callouts = [
     ...(faultModule ? [{ id: faultModule, text: `${shortLabel(faultModule)}: louder than normal, +${faultDelta(faultModule).toFixed(1)} dBA` }] : []),
     ...frame.active
       .filter((inc) => inc.part !== faultModule)
       .map((inc) => ({ id: inc.part, text: `${shortLabel(inc.part)}: ${inc.what.replace(/ started$/, '')}, ${inc.kind === 'activity' ? `${Math.round(levels[inc.part])} dBA` : `+${Math.round(levels[inc.part] - baseLv[inc.part])} dBA`}` })),
   ];
+  if (trend && !callouts.some((c) => c.id === trend.part)) callouts.push({ id: trend.part, kind: 'trend', text: `${shortLabel(trend.part)}: getting louder, +${trend.rise.toFixed(1)} dBA in ${trend.span} days` });
   const panelShift = showPanel && panelOpen && wide ? 380 : 0;
   const incidentBox = selInc ? <LiveIncident inc={selInc} since={clockAt(selInc.since)} delta={levels[selInc.part] - baseLv[selInc.part]} place={place} /> : null;
   // The fault shown in a module's spectrum: the demo fault, or a live incident there.
@@ -347,9 +351,9 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
             {sel ? (
               <>
                 {base ? (
-                  <BaseDetail compact={compact} part={sel} level={levels2[sel.id]} why={whys[sel.id]} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
+                  <BaseDetail compact={compact} part={sel} level={levels2[sel.id]} why={whys[sel.id]} fault={faultFor(sel.id)} live={live} incident={incidentBox} extra={<><TrendBlock trend={trend?.part === sel.id ? trend : null} /><ProtectHere spectrumId={spectrumIdOf(place, sel.id)} fault={faultFor(sel.id)} watch={watch} /></>} />
                 ) : (
-                  <ModuleDetail compact={compact} part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} />
+                  <ModuleDetail compact={compact} part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} extra={place === 'iss' && !sel.struct && <><TrendBlock trend={trend?.part === sel.id ? trend : null} /><ProtectHere spectrumId={sel.id} fault={faultFor(sel.id)} watch={watch} /></>} />
                 )}
                 {live && hereLog.length > 0 && (
                   <details className="here-log">
@@ -370,13 +374,21 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
               </>
             ) : (
               <>
-                {frame.active.length === 0 && !faultModule && <p className="muted small">All modules at their usual levels.</p>}
+                {frame.active.length === 0 && !faultModule && !trend && <p className="muted small">All modules at their usual levels.</p>}
                 <ul className="now-rows">
                   {faultModule && (
                     <li>
                       <button className="now-row" onClick={() => pick(faultModule)} onMouseEnter={() => setHover(faultModule)} onMouseLeave={() => setHover(null)}>
                         <span className="event-dot" aria-hidden="true" />
                         <span><strong>{STATIONS[place].faultName}</strong> louder than normal <span className="muted">+{faultDelta(faultModule).toFixed(1)} dBA</span></span>
+                      </button>
+                    </li>
+                  )}
+                  {trend && (
+                    <li>
+                      <button className="now-row" onClick={() => pick(trend.part)} onMouseEnter={() => setHover(trend.part)} onMouseLeave={() => setHover(null)}>
+                        <span className="trend-dot" aria-hidden="true">↗</span>
+                        <span><strong>{partLabel(trend.part)}</strong> getting louder <span className="muted">+{trend.rise.toFixed(1)} dBA in {trend.span} days</span></span>
                       </button>
                     </li>
                   )}
@@ -438,6 +450,50 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   );
 }
 
+// Early warning (simulated): a module creeping louder over days, before it becomes a fault.
+function TrendBlock({ trend }) {
+  if (!trend) return null;
+  const sig = signatureOf(trend.signature);
+  const hz = (b) => (b >= 1000 ? `${b / 1000} kHz` : `${b} Hz`);
+  return (
+    <div className="trend-block">
+      <span className="label-caps">Getting louder</span>
+      <p className="source-big">
+        <span className="trend-dot" aria-hidden="true">↗</span> +{trend.rise.toFixed(1)} dBA over {trend.span} days
+      </p>
+      <div className="trend-bars" aria-hidden="true">
+        {trend.days.map((d, i) => <span key={i} style={{ height: `${12 + (d / trend.rise) * 28}px` }} />)}
+      </div>
+      <p className="source-detail">
+        Mostly at {sig.bands.map(hz).join(' and ')}, like a ventilation fan wearing out. Protect your ears here until it's checked.
+        <Info>Simulated trend, modelled on a real case: a Columbus ventilation fan grew noisier for about 15 days before it was switched off (Parzianello et al., ESMATS 2011). NASA trends its sound surveys to catch hardware going bad before it fails (Welsh, Denham & Allen 2011).</Info>
+      </p>
+    </div>
+  );
+}
+
+// Which protector suits this module's noise, and whether it reaches the crew member's weakest pitch.
+function ProtectHere({ spectrumId, fault, watch }) {
+  const f = fault === true ? { signature: 'stalled-fan', rise: 8 } : fault || null;
+  const prot = protectorFor(spectrumId, f);
+  const lvl = watch ? levelReaching(spectrumId, watch.f, f) : null;
+  const hz = (b) => (b >= 1000 ? `${b / 1000} kHz` : `${b} Hz`);
+  return (
+    <div className="protect-here">
+      <span className="label-caps">Best protection here</span>
+      <p>
+        <strong>{prot.name}</strong>
+        <Info>{protectorWhy(prot)} NASA lists foam ear inserts, passive muffs and noise-cancelling (ANR) headsets as ISS hearing countermeasures; noise cancelling adds most below 1 kHz. Choosing by spectrum is Earshot's rule, from NASA's measured spectra (Allen 2024).</Info>
+      </p>
+      {lvl !== null && lvl >= REACH_DBA && (
+        <p className="small warn-text">
+          Reaches your {watch.ear} ear's {hz(watch.f)}, which is on watch: {Math.round(lvl)} dBA at {reachLabel(watch.f)}, just below it.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // A live incident in the selected area: what happened, since when, and where the noise comes from.
 function LiveIncident({ inc, since, delta, place }) {
   const sig = inc.kind === 'fault' ? signatureOf(inc.signature) : null;
@@ -461,7 +517,7 @@ function LiveIncident({ inc, since, delta, place }) {
   );
 }
 
-function BaseDetail({ compact, part, level, why, fault, live, incident }) {
+function BaseDetail({ compact, part, level, why, fault, live, incident, extra }) {
   return (
     <div className="module-detail">
       <h3>{part.label}</h3>
@@ -474,13 +530,14 @@ function BaseDetail({ compact, part, level, why, fault, live, incident }) {
         <p className="muted">No value.</p>
       )}
       {incident}
+      {extra}
       <p className="small">{why}</p>
       <Spectrum id={part.id} fault={fault} hideSource={!!incident} showSources={!compact} />
     </div>
   );
 }
 
-function ModuleDetail({ part, level, place, mode, fault, incident, compact }) {
+function ModuleDetail({ part, level, place, mode, fault, incident, compact, extra }) {
   const m = byId[part.id];
   const sleepers = SLEEP_IN[part.id] ?? [];
   return (
@@ -496,6 +553,7 @@ function ModuleDetail({ part, level, place, mode, fault, incident, compact }) {
         <p className="muted">No dBA value published (reported only as meeting NASA's NC-50 limit, or not measured).</p>
       )}
       {incident}
+      {extra}
       {m?.date && !compact && <p className="muted">NASA survey of {m.date}</p>}
       {place === 'iss' && !part.struct && <Spectrum id={part.id} fault={fault} hideSource={!!incident} showSources={!compact} />}
       {sleepers.length > 0 && (

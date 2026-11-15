@@ -137,7 +137,7 @@ export default function App() {
       if (!hit || (session.events ?? []).some((e) => e.type === 'live' && e.key === hit.key)) return;
       const delta = incidentDelta(hit, spectrumIdOf(session.station, hit.part));
       const cause = hit.kind === 'fault' ? `Likely ${hit.during}, +${delta.toFixed(1)} dBA` : `${hit.during[0].toUpperCase()}${hit.during.slice(1)}`;
-      const e = { type: 'live', key: hit.key, part: hit.part, where: partLabel(session.station, hit.part), cause, pitches: incidentPitches(hit), at: Date.now() };
+      const e = { type: 'live', key: hit.key, part: hit.part, where: partLabel(session.station, hit.part), cause, pitches: incidentPitches(hit), kind: hit.kind, signature: hit.signature ?? null, rise: hit.rise ?? null, spectrumId: spectrumIdOf(session.station, hit.part), at: Date.now() };
       changeSession((prev) => ({ ...prev, events: [...(prev.events ?? []).filter((x) => x.type !== 'live'), e] }));
     }, 1000);
     return () => clearInterval(id);

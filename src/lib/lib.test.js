@@ -370,3 +370,30 @@ describe('simulated check scenarios', () => {
     expect(low.right[250] - none.right[250]).toBe(15);
   });
 });
+
+import { protectorFor, reachingBands, levelReaching, watchPitches, signatureReaches, trendFor } from './protect.js';
+describe('protection by spectrum, weakest pitch, trend', () => {
+  it('picks a noise-cancelling headset for low-pitched noise and foam for higher noise', () => {
+    expect(protectorFor('jem', { signature: 'low-freq', rise: 8 }).id).toBe('anr');
+    expect(protectorFor('lab', { signature: 'pump-speed', rise: 7 }).id).toBe('foam');
+    expect(protectorFor('mlm').id).toBe('foam');
+    expect(protectorFor('node2').basis).toBe('default'); // NC rating only: no measured spectrum
+  });
+  it('a pitch is reached by bands half an octave to an octave below it (octave bands: f/2 to f)', () => {
+    expect(reachingBands(4000)).toEqual([2000, 4000]);
+    expect(reachingBands(3000)).toEqual([2000]);
+    expect(signatureReaches('pump-speed', 4000)).toBe(true);
+    expect(signatureReaches('low-freq', 4000)).toBe(false);
+    expect(levelReaching('mlm', 4000)).toBeGreaterThan(levelReaching('lab', 4000));
+  });
+  it('finds the watch pitch from the latest check', () => {
+    const b = PERSONAS.find((p) => p.id === 'high');
+    const w = watchPitches(b.state())[0];
+    expect(w.f).toBe(4000);
+    expect(w.d).toBeGreaterThanOrEqual(5);
+  });
+  it('has a simulated trend per station', () => {
+    expect(trendFor('iss').part).toBe('cof');
+    expect(trendFor('iss').rise).toBeCloseTo(1.8);
+  });
+});

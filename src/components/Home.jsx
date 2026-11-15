@@ -2,6 +2,8 @@
 // Reviewed and directed by the team. See AI_USE.md.
 // My ears: one verdict first (what changed, how much, what to do), "Why" on request, then the two cochleas
 // and one simple line of change over time.
+import { shortPart } from '../lib/live.js';
+import { NormalList } from './IsThisNormal.jsx';
 import { useMemo, useState } from 'react';
 import Cochlea from './Cochlea.jsx';
 import { averageBaselines, shifts, regionStatusFor, FREQUENCIES } from '../lib/rules.js';
@@ -29,6 +31,7 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1);
 export default function Home({ data, onStartTest, onOpenSudden, simulated, earplugs = [], go, onReport, onSimulatedFullCheck }) {
   const [reporting, setReporting] = useState(null); // null | 'symptom' | { symptom }
   const [picked, setPicked] = useState(null);
+  const [showNormal, setShowNormal] = useState(false);
   const baselines = baselineTests(data);
   const check = latestCheck(data);
   const reference = baselines.length >= 2 ? averageBaselines(baselines[0].thresholds, baselines[1].thresholds) : null;
@@ -137,7 +140,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
         {quickCta && (simulated ? <button className="primary" onClick={() => onSimulatedFullCheck(lastQuick.truth)}>Run the full check (simulated)</button> : <button className="primary" onClick={() => onStartTest('check')}>Full check now</button>)}
         {earplugs.length > 0 && (findings.length ? findings.some((f) => f.kind === 'high') : !!worst && worst.frequency >= 2000) && (
           <p>
-            Earshot has added earplugs to today: {earplugs.map((n) => n.replace(/^.*\((.*)\)$/, '$1')).join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See today</button>
+            Earshot has added hearing protection to today: {earplugs.map(shortPart).join(', ')}. <button className="link-button inline-link" onClick={() => go('plan')}>See today</button>
           </p>
         )}
         {cogLine && (
@@ -145,6 +148,14 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
             {cogLine}
             <Info>{`Canadian Space Agency PRET open data: ${cog.detail}${/volunteer/.test(data.cognition?.[0]?.source ?? '') ? ' Scores: the real record of one CSA PRET volunteer (2015), paired with this simulated hearing record.' : ''}`}</Info>
           </p>
+        )}
+        {check && reference && (findings.some((f) => f.kind !== 'sudden') || worst) && (
+          <button className="secondary normal-btn" onClick={() => setShowNormal(true)}>Is this normal? <span aria-hidden="true">›</span></button>
+        )}
+        {showNormal && (
+          <Sheet side="right" title="Is this normal?" onClose={() => setShowNormal(false)}>
+            <NormalList data={data} />
+          </Sheet>
         )}
         <div className="ears-actions">
           {reference && <button className="primary" onClick={() => go('quick/general')}>Quick check · 2 min</button>}

@@ -342,7 +342,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
 
   // Rebuild the callout elements only when which modules have one changes; update their text in place,
   // so a live number ticking never replaces the button under the user's finger.
-  const calloutKey = callouts.map((c) => c.id).join(';');
+  const calloutKey = callouts.map((c) => `${c.id}:${c.kind ?? ''}`).join(';');
   useEffect(() => {
     for (const c of calloutsRef.current) {
       const t = callouts.find((x) => x.id === c.id)?.text;
@@ -356,7 +356,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     layer.innerHTML = '';
     calloutsRef.current = callouts.map((c) => {
       const el = document.createElement('button');
-      el.className = 'callout';
+      el.className = `callout${c.kind ? ` ${c.kind}` : ''}`;
       el.innerHTML = `<span class="callout-dot"></span><span class="callout-text"></span><span class="callout-more">›</span>`;
       el.querySelector('.callout-text').textContent = c.text;
       el.addEventListener('click', (e) => {

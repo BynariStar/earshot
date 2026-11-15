@@ -104,6 +104,12 @@ export function whereAt(station, s) {
 export function partsOf(station) {
   return BASES[station] ? BASES[station].parts : ISS_PARTS;
 }
+// "Node 2 (Harmony)" -> "Harmony"; "Columbus (ESA)" -> "Columbus" (an agency in brackets isn't the module's name).
+export const shortPart = (label) => {
+  const l = String(label).replace(' (earplugs)', '').replace(/^Level \d · /, '');
+  const m = l.match(/^(.*) \((.*)\)$/);
+  return m ? (/^(ESA|JAXA|NASA|CSA)$/.test(m[2]) ? m[1] : m[2]) : l;
+};
 export const partLabel = (station, id) => partsOf(station).find((p) => p.id === id)?.label ?? id;
 // The module whose NASA spectrum a part's fault is applied to (bases borrow their ISS counterpart's).
 export const spectrumIdOf = (station, id) => (BASES[station] ? BASES[station].parts.find((p) => p.id === id)?.iss ?? id : id);

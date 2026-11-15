@@ -11,6 +11,8 @@ import {
 import { hearingState, TARGETS } from '../lib/personal.js';
 import { BASES } from '../lib/bases.js';
 import Info from './Info.jsx';
+import { protectorFor, protectorWhy, PROTECTORS, watchPitches, levelReaching, reachLabel, REACH_DBA } from '../lib/protect.js';
+import { spectrumIdOf, shortPart } from '../lib/live.js';
 import Stepper from './Stepper.jsx';
 import Picker from './Picker.jsx';
 
@@ -30,14 +32,14 @@ function DayBar({ result }) {
     <div className="daybar" aria-label="Your 16-hour workday">
       {result.day.map((s) => (
         <span key={s.id} style={{ flex: s.minutes, background: noiseColor(s.dba) }} title={`${s.name}: ${hm(s.minutes)} at ${s.dba.toFixed(1)} dBA`}>
-          {s.minutes >= 90 ? SHORT[s.id] ?? s.name.replace(/^Level \d · /, '').replace(' (earplugs)', '').replace(/^.*\((.*)\)$/, '$1') : ''}
+          {s.minutes >= 90 ? SHORT[s.id] ?? shortPart(s.name) : ''}
         </span>
       ))}
     </div>
   );
 }
 
-const shortName = (n) => n.replace(' (earplugs)', '').replace(/^Level \d · /, '').replace(/^.*\((.*)\)$/, '$1');
+const shortName = (n) => shortPart(n);
 
 export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focus, alerts = [], events = [], go }) {
   const [editing, setEditing] = useState(focus === 'sleep' ? { type: 'sleep' } : null);
@@ -55,8 +57,26 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
   const hs = hearingState(data);
   // Earplugs: flagged activities and modules, plus a module with a live fault right now.
   const live = events.find((e) => e.type === 'live');
-  const earplugs = [...flagged.map((f) => SHORT[f.id] ?? f.name.replace(/^.*\((.*)\)$/, '$1'))];
-  if (live && !flagged.some((f) => f.id === live.part)) earplugs.push(`${live.where.replace(/^.*\((.*)\)$/, '$1')} until it's fixed`);
+  // Which protector for each flagged item: from the NASA spectrum where there is one (see protect.js).
+  const protOf = (placeId) => (placeId ? protectorFor(spectrumIdOf(plan.base, placeId)) : { ...PROTECTORS.foam, basis: 'default' });
+  const protected_ = flagged.map((f) => ({ name: SHORT[f.id] ?? shortPart(f.name), prot: protOf(f.placeId) }));
+  if (live && !flagged.some((f) => f.placeId === live.part)) {
+    const prot = live.kind === 'fault' ? protectorFor(live.spectrumId, { signature: live.signature, rise: live.rise }) : { ...PROTECTORS.foam, basis: 'default' };
+    protected_.push({ name: `${shortPart(live.where)} until it's fixed`, prot });
+  }
+  const earplugs = protected_.map((x) => x.name);
+  const groups = ['foam', 'anr'].map((id) => ({ id, names: protected_.filter((x) => x.prot.id === id).map((x) => x.name) })).filter((g) => g.names.length);
+  const protTitle = groups.map((g) => `${PROTECTORS[g.id].name} for ${listJoin(g.names)}`).join('. ');
+  const anrWhy = protected_.find((x) => x.prot.id === 'anr');
+  // Your weakest pitch: which of today's places puts the most noise just below it.
+  const watch = watchPitches(data)[0] ?? null;
+  const reach = watch
+    ? timeline(r)
+        .filter((s) => s.placeId)
+        .map((s) => ({ s, lvl: levelReaching(spectrumIdOf(plan.base, s.placeId), watch.f) }))
+        .filter((x) => x.lvl !== null && x.lvl >= REACH_DBA)
+        .sort((a, b) => b.lvl - a.lvl)[0] ?? null
+    : null;
   const exposure = alerts.find((a) => a.id === 'exposure');
   const sleepOk = r.sleepModule.dba <= 50;
   const items = timeline(r);
@@ -111,13 +131,14 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
           <li>
             <span className={`rec-icon${earplugs.length ? ' todo' : ''}`} aria-hidden="true">{earplugs.length ? '!' : '✓'}</span>
             <div>
-              <strong>{earplugs.length ? `Earplugs for ${listJoin(earplugs)}` : 'No earplugs needed today'}</strong>
+              <strong>{earplugs.length ? protTitle : 'No hearing protection needed today'}</strong>
               <span className="muted">
                 {next ? `Next: ${shortName(next.name)} at ${clockOf(next.start)}. ` : ''}
                 {earplugs.length ? `With them, today uses ${pct}% of your noise allowance; without them, ${Math.round(skip.dosePct)}%.` : `Today uses ${pct}% of your noise allowance.`}
                 <Info>
                   Earshot flags anything above {target.protectAbove} dBA{target.protectAbove < 72 ? ' (lowered from 72 dBA because your ears changed)' : ' (Flight Rule B13-152 requires protection above 72 dBA)'}, and any module with a live fault. Earplugs
-                  count as {PLUG_DB.toFixed(1)} dB, from NASA's treadmill figure.
+                  count as {PLUG_DB.toFixed(1)} dB, from NASA's treadmill figure. The protector follows each place's NASA spectrum: a noise-cancelling headset where most of the noise is below 1 kHz, where foam earplugs block least; foam earplugs otherwise, and wherever NASA has no spectrum (the exercise machines).
+                  {anrWhy ? ` ${anrWhy.name}: ${protectorWhy(anrWhy.prot)}` : ''}
                 </Info>
               </span>
             </div>
@@ -130,6 +151,18 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
                 <span className="muted">
                   After today's loud exposure, keep the evening and night under 62 dBA so your ears can recover.
                   <Info>Flight Rule B13-152 counts 62 dBA or less as hearing rest; NASA's sleep target is 50 dBA.</Info>
+                </span>
+              </div>
+            </li>
+          )}
+          {reach && (
+            <li>
+              <span className="rec-icon todo" aria-hidden="true">!</span>
+              <div>
+                <strong>Protect your {watch.ear} ear's {watch.f >= 1000 ? `${watch.f / 1000} kHz` : `${watch.f} Hz`} in {shortName(reach.s.name)}</strong>
+                <span className="muted">
+                  It's {watch.d} dB worse than your baseline. Of today's places, {shortName(reach.s.name)} puts the most noise at {reachLabel(watch.f)}, just below it ({Math.round(reach.lvl)} dBA), at {clockOf(reach.s.start)}. Wear {protOf(reach.s.placeId).noun} for all of it.
+                  <Info>Lab studies find noise does the most temporary harm half an octave to an octave above its own pitch (Maslen 1980, summarising the literature), so Earshot ranks today's places by the noise in the bands just below your weakest pitch, from NASA's measured spectra (Allen 2024). It's a rule of thumb from narrow-band, largely animal studies. The treadmill, ARED and modules with only an NC rating have no measured spectrum, so they aren't ranked.</Info>
                 </span>
               </div>
             </li>
@@ -205,7 +238,7 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
                 <i style={{ background: noiseColor(seg.rawDba) }} aria-hidden="true" />
                 <span className="day-name">{seg.id === 'fill' ? `The rest: ${shortName(seg.name)}` : seg.kind === 'activity' ? (seg.id === 't2' ? 'T2 treadmill' : 'ARED exercise') : shortName(seg.name)}</span>
                 <span className="day-meta">{times[seg.id] ? `${times[seg.id]} · ` : ''}{hm(seg.minutes)} · {seg.rawDba} dBA</span>
-                {seg.protectedNow && <span className="day-tag">Earplugs</span>}
+                {seg.protectedNow && <span className="day-tag">{protOf(seg.placeId).short}</span>}
                 <span className="chev" aria-hidden="true">›</span>
               </button>
             );

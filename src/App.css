@@ -994,3 +994,34 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 .test-line.row > span:first-child { white-space: nowrap; }
 .test-line.row > strong { white-space: nowrap; }
 .test-line.row > span.muted:nth-of-type(2) { flex: 1; font-size: 0.9rem; }
+
+/* Early warning (simulated trend) and protection advice */
+.callout.trend { border-color: var(--watch); }
+.callout.trend::after { border-right-color: var(--watch); border-bottom-color: var(--watch); }
+.callout.trend .callout-dot { background: var(--watch); animation: none; }
+.trend-dot { color: var(--watch); font-weight: 700; flex: none; width: 18px; text-align: center; }
+.trend-block { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin: 8px 0 12px; border-radius: 14px; background: color-mix(in srgb, var(--watch) 10%, transparent); border: 1px solid color-mix(in srgb, var(--watch) 40%, transparent); }
+.trend-bars { display: flex; align-items: flex-end; gap: 6px; height: 42px; }
+.trend-bars span { width: 18px; border-radius: 4px 4px 0 0; background: var(--watch); opacity: 0.75; }
+.trend-bars span:last-child { opacity: 1; }
+.protect-here { margin: 6px 0 12px; }
+.protect-here p { margin: 2px 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.protect-here strong { font-size: 1.1rem; }
+
+/* Is this normal? flyout */
+.normal-btn { align-self: flex-start; margin: 4px 0 8px; }
+.nl-rows { list-style: none; padding: 0; margin: 10px 0; display: flex; flex-direction: column; gap: 4px; }
+.nl-row { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--border); }
+.nl-row:last-child { border-bottom: 0; }
+.nl-row strong { font-size: 1.02rem; }
+.nl-verdict { margin: 2px 0 0; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nl-icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+.nl-icon.ok { color: var(--ok); } .nl-icon.watch { color: var(--watch); } .nl-icon.flag { color: var(--shift); }
+.nl-row .mini { width: 200px; margin-top: 6px; }
+
+/* Tablets (701-1100 px): with a module panel open, keep the Live/Day/Average pill and the time bar clear. */
+@media (min-width: 701px) and (max-width: 1100px) {
+  .home-app .map-panel { top: 88px; }
+  .station-stage:has(.map-panel) ~ .demo-fab, .station-home:has(.map-panel) .demo-fab { bottom: 96px; }
+}
+.map-time button { white-space: nowrap; }

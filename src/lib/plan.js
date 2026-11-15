@@ -152,7 +152,7 @@ export function applyFlags(plan, protectAbove) {
   const p = normalize(plan);
   const protect = { loudPlaces: protectAbove <= 60 };
   for (const a of ACTIVITIES) protect[a.id] = a.dba > protectAbove && (p.activities[a.id] ?? 0) > 0;
-  const flagged = computePlan({ ...p, protect }).day.filter((s) => s.protectedNow).map((s) => ({ id: s.id, name: s.name.replace(' (earplugs)', ''), dba: s.rawDba }));
+  const flagged = computePlan({ ...p, protect }).day.filter((s) => s.protectedNow).map((s) => ({ id: s.id, placeId: s.placeId ?? null, name: s.name.replace(' (earplugs)', ''), dba: s.rawDba }));
   return { plan: { ...p, protect }, flagged };
 }
 

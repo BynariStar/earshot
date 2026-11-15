@@ -24,7 +24,6 @@ export default function Welcome({ onStart, initial, onAbout, onExplore }) {
         <img className="brand-mark" src="./favicon.svg" alt="" aria-hidden="true" />
         <div>
           <h1>Earshot</h1>
-          <p className="muted">Watches the noise around you, catches hearing changes early, and tells you what to do.</p>
         </div>
       </header>
 

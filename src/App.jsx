@@ -3,7 +3,7 @@
 // App shell. Start screen (station + who you are), then a home that is the live station map with alerts.
 // Routes live in the URL hash (#/ears, #/plan, ...) so the phone's back button works like an app's.
 // Your own results and each simulated crew member's are stored separately, so switching never overwrites.
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import Welcome from './components/Welcome.jsx';
 import StationHome from './components/StationHome.jsx';
 import Home from './components/Home.jsx';
@@ -111,6 +111,7 @@ export default function App() {
   const [realNowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   // The guided demo steers the simulation only: the live feed's clock and the time of day.
   const [clockOverride, setClockOverride] = useState(null);
+  const startRef = useRef(null); // the guided demo starts its session directly, without the start screen
   const nowMin = clockOverride ?? realNowMin;
   useEffect(() => {
     const on = (e) => {
@@ -118,6 +119,7 @@ export default function App() {
       if (d.type === 'live-at') changeSession((prev) => (prev ? { ...prev, liveStart: Date.now() - d.s * 1000, pausedAt: null } : prev));
       if (d.type === 'pause') changeSession((prev) => (prev && !prev.pausedAt ? { ...prev, pausedAt: Date.now() } : prev));
       if (d.type === 'clock') setClockOverride(d.min);
+      if (d.type === 'start') startRef.current?.({ station: d.station, persona: d.persona, events: [] });
     };
     window.addEventListener('earshot-demo', on);
     return () => window.removeEventListener('earshot-demo', on);
@@ -215,6 +217,7 @@ export default function App() {
     </>
   );
 
+  startRef.current = (s) => start(s);
   function start(s) {
     setSession({ ...s, seen: [], bellSeen: [], done: [], liveStart: Date.now(), pausedAt: null });
     setPlan(scheduleFor(s.station)); // each session starts from the crew's (simulated) schedule

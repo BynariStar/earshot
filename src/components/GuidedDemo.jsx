@@ -13,12 +13,10 @@ const send = (detail) => window.dispatchEvent(new CustomEvent('earshot-demo', { 
 
 const SCRIPT = [
   async (d) => {
+    send({ type: 'start', station: 'iss', persona: 'high' });
     d.say("Earshot checks astronauts' hearing and the noise around them. Crew member B: 60 days into an ISS mission (simulated).");
-    await d.wait(2500);
-    await d.tap('.station-choice', 'International Space Station');
-    await d.tap('.choice', 'Crew member B');
-    await d.tap('button.primary', 'Start');
-    await d.wait(1200);
+    await d.find('.station3d canvas', null, 8000);
+    await d.wait(4000);
   },
   async (d) => {
     send({ type: 'live-at', s: 8 });

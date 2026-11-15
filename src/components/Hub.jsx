@@ -99,7 +99,7 @@ export default function Hub({ data, plan, go, onStartTest, onLoadDemo, onExitDem
             <h2>Plan a workday</h2>
             <span className="badge">Flight rule check</span>
           </div>
-          <AllowanceCard result={day} earplugs={plan.earplugs} compact />
+          <AllowanceCard result={day} compact />
           <p>
             Planned day averages <strong>{day.work.leqDba.toFixed(1)} dBA</strong>
             {day.top ? `; ${day.top.name} uses the most (${Math.round(day.top.dosePct)}%).` : '.'}

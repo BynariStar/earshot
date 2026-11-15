@@ -25,5 +25,7 @@ export function saveLogs(logs) {
 
 // The noise-only record a crew member could choose to share with the ground (never hearing data).
 export function shareable(logs) {
-  return logs.map(({ date, activities, earplugs, background, sleepAt, events }) => ({ date: date.slice(0, 10), activities, earplugs, background, sleepAt, events }));
+  return logs.map(({ date, base, activities, protect, earplugs, places, fill, background, audio, sleepAt, events, dosePct }) => ({
+    date: date.slice(0, 10), base, activities, protect: protect ?? { t2: earplugs }, places, fill: fill ?? background, audio, sleepAt, events, dosePct: Math.round(dosePct),
+  }));
 }

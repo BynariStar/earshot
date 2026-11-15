@@ -134,7 +134,7 @@ export default function App() {
             <Station />
           </Suspense>
         )}
-        {section === 'plan' && <Planner plan={plan} setPlan={setPlan} />}
+        {section === 'plan' && <Planner plan={plan} setPlan={setPlan} data={data} />}
         {section === 'fleet' && <Fleet />}
       </main>
       <Footer />

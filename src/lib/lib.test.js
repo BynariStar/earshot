@@ -253,3 +253,33 @@ describe('simulated fleet view', () => {
     expect(analyzeFleet(simulateFleet()).over).toBe(a.over);
   });
 });
+
+import { setPlaceMinutes } from './plan.js';
+import { TARGETS, planChecks } from './personal.js';
+describe('planner with places, protection, earphones and personal targets', () => {
+  it('caps listed places so the workday never overflows 16 hours', () => {
+    let p = { ...DEFAULT_PLAN, places: [{ id: 'sm', minutes: 0 }, { id: 'mlm', minutes: 0 }] };
+    p = setPlaceMinutes(p, 0, 600);
+    p = setPlaceMinutes(p, 1, 600);
+    const r = computePlan(p);
+    expect(r.day.reduce((a, s) => a + s.minutes, 0)).toBe(WORKDAY_MIN);
+    expect(r.activityMinutes).toBeLessThanOrEqual(WORKDAY_MIN);
+  });
+  it('earphones count toward the allowance even when the treadmill is plugged', () => {
+    const quiet = computePlan({ ...DEFAULT_PLAN, protect: { t2: true, ared: false, loudPlaces: false } });
+    const loud = computePlan({ ...DEFAULT_PLAN, protect: { t2: true, ared: false, loudPlaces: false }, audio: { minutes: 120, dba: 90 } });
+    expect(quiet.dosePct).toBeLessThan(30);
+    expect(loud.dosePct).toBeGreaterThan(100);
+  });
+  it('gives stricter checks for a high-pitch change than for steady ears', () => {
+    const r = computePlan({ ...DEFAULT_PLAN, protect: { t2: true, ared: false, loudPlaces: false } });
+    const steadyFails = planChecks(r, TARGETS.steady).filter((c) => !c.ok).length;
+    const highFails = planChecks(r, TARGETS.high).filter((c) => !c.ok).length;
+    expect(highFails).toBeGreaterThan(steadyFails); // e.g. ARED at 66.3 dBA unprotected, sleep above 50
+  });
+  it('turns the remaining allowance into treadmill minutes', () => {
+    const r = computePlan({ ...DEFAULT_PLAN, activities: { t2: 0, ared: 0 } });
+    expect(r.headroom(84.5)).toBeGreaterThan(40);
+    expect(r.headroom(84.5)).toBeLessThan(54); // all of the allowance would be about 53 min
+  });
+});

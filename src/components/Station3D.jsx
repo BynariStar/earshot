@@ -136,6 +136,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
   highlightRef.current = hiList;
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const youRef = useRef(you);
+  youRef.current = you;
 
   // Build the scene once per part list.
   useEffect(() => {
@@ -274,7 +276,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
         if (v.z <= 1) {
           const mw = mk.scale.x * h * 1.15;
           const mh = mk.scale.y * h * 1.15;
-          placed.push({ x: ((v.x + 1) / 2) * w - mw / 2, y: ((1 - v.y) / 2) * h - mh, w: mw, h: mh });
+          placed.push({ x: ((v.x + 1) / 2) * w - mw / 2, y: ((1 - v.y) / 2) * h - mh, w: mw, h: mh, you: true });
         }
       }
       const order = [...calloutsRef.current].sort((a, b) => (b.open ? 1 : 0) - (a.open ? 1 : 0));
@@ -291,14 +293,33 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
         const cw = c.el.offsetWidth;
         const ch = c.el.offsetHeight;
         // Keep clear of the map buttons on the right (and of the details panel when it's open).
-        const x = Math.max(8, Math.min(((v.x + 1) / 2) * w - cw / 2, w - offsetRef.current - 84 - cw));
-        let y = ((1 - v.y) / 2) * h - ch - c.lift;
+        const maxX = w - offsetRef.current - 84 - cw;
+        const clampX = (px) => Math.max(8, Math.min(px, maxX));
+        const x0 = clampX(((v.x + 1) / 2) * w - cw / 2);
+        const y0 = ((1 - v.y) / 2) * h - ch - c.lift;
         const gap = 14; // room for the pointer under each callout
-        for (let guard = 0; guard < 8; guard++) {
-          const hit = placed.find((p) => x < p.x + p.w + 6 && p.x < x + cw + 6 && y < p.y + p.h + gap && p.y < y + ch + gap);
-          if (!hit) break;
-          y = hit.y - ch - gap;
+        // The callout for the module you're in is already lifted above the "You" label; don't count it twice.
+        const others = c.id === youRef.current ? placed.filter((p) => !p.you) : placed;
+        const hits = (px, py) => others.some((p) => px < p.x + p.w + 6 && p.x < px + cw + 6 && py < p.y + p.h + gap && p.y < py + ch + gap);
+        // Nearest free spot to the module's anchor: where it is, or beside / above whatever is in the way.
+        let best = { x: x0, y: y0 };
+        if (hits(x0, y0)) {
+          const cands = [];
+          for (const p of others) {
+            cands.push({ x: x0, y: p.y - ch - gap });
+            cands.push({ x: clampX(p.x - cw - 8), y: y0 });
+            cands.push({ x: clampX(p.x + p.w + 8), y: y0 });
+            cands.push({ x: clampX(p.x - cw - 8), y: p.y });
+            cands.push({ x: clampX(p.x + p.w + 8), y: p.y });
+          }
+          const free = cands.filter((q) => q.y > 0 && !hits(q.x, q.y)).sort((a, b) => Math.hypot(a.x - x0, a.y - y0) - Math.hypot(b.x - x0, b.y - y0));
+          if (free.length) best = free[0];
+          else {
+            best = { x: x0, y: y0 };
+            for (let guard = 0; guard < 8 && hits(best.x, best.y); guard++) best.y -= ch + gap;
+          }
         }
+        const { x, y } = best;
         placed.push({ x, y, w: cw, h: ch });
         c.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
       }

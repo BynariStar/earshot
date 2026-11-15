@@ -1070,3 +1070,5 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
   .ears-grid .ears.two { max-width: none; gap: 12px; }
   .ears-grid .trend { margin-top: 8px; }
 }
+.ears-trend { grid-column: 1 / -1; }
+.ears-trend .trend { margin-top: 4px; }

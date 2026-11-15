@@ -165,7 +165,6 @@ export default function Home({ tools = null, data, onStartTest, onOpenSudden, si
           {cta && <button className={reference ? 'secondary' : 'primary'} onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
         </div>
       </div>
-      <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
       </div>
 
       <div className="ears-col-right">
@@ -198,6 +197,10 @@ export default function Home({ tools = null, data, onStartTest, onOpenSudden, si
           baseline, using NASA's hearing-shift rules: green steady, yellow 5 to 9 dB worse, orange 10 dB or more, red 30 dB or more, grey no response at baseline.
         </Info>
       </p>
+      </div>
+      {/* Full width under both columns: the chart is wide and short, so a column would shrink its labels. */}
+      <div className="ears-trend">
+        <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
       </div>
       {reporting === 'symptom' && (
         <Sheet title="Report a symptom" onClose={() => setReporting(null)}>

@@ -44,10 +44,14 @@ export default function QuickCheck({ kind, data, persona, events, onSave, onSimu
   const [scenario, setScenario] = useState('expected');
   function runSimulated() {
     const reportedEar = events.find((e) => e.type === 'ringing')?.ear;
-    const truth = scenarioThresholds(persona, events, scenario, reportedEar === 'left' ? 'left' : 'right');
+    // "No change" means exactly this crew member's own baseline. Simulated responses are seeded per scenario,
+    // ear and pitch, so the same scenario always gives the same result (repeatable demos).
+    const truth = scenario === 'none' ? ref : scenarioThresholds(persona, events, scenario, reportedEar === 'left' ? 'left' : 'right');
     truthRef.current = truth;
     const t = { left: {}, right: {} };
-    for (const ear of ['left', 'right']) for (const f of pitches) t[ear][f] = simulate(f, ear, truth[ear][f]).threshold;
+    const seeded = (seed) => () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+    const seedOf = (str) => [...str].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0, 7);
+    for (const ear of ['left', 'right']) for (const f of pitches) t[ear][f] = simulate(f, ear, truth[ear][f], { rng: seeded(seedOf(`${scenario}:${ear}:${f}`)) }).threshold;
     finish(t, true);
   }
 

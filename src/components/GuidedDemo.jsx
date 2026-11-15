@@ -52,7 +52,7 @@ const SCRIPT = [
     await d.wait(800);
     await d.tap('.scenarios .row', 'No change');
     await d.tap('button.primary', 'Simulate');
-    d.say('No lasting change: every pitch within a few dB of baseline.');
+    d.say('No lasting change: within test error, so nothing to act on.');
     await d.wait(3000);
   },
   async (d) => {

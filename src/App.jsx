@@ -16,7 +16,7 @@ import QuickCheck from './components/QuickCheck.jsx';
 import AlertPage from './components/AlertPage.jsx';
 import TestsMenu from './components/TestsMenu.jsx';
 import TabBar from './components/TabBar.jsx';
-import AlertsSheet from './components/AlertsSheet.jsx';
+import Alerts from './components/Alerts.jsx';
 import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan, applyFlags, normalize, scheduleFor, timeline } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
@@ -47,7 +47,7 @@ function useRoute() {
   return [route, go];
 }
 
-const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Today', test: 'Hearing test', quick: 'Quick check', about: 'Sources and disclosures' };
+const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Today', alerts: 'Alerts', test: 'Hearing test', quick: 'Quick check', about: 'Sources and disclosures' };
 const APP_START = Date.now();
 
 const personaFor = (s) => (!s || s.persona === 'own' ? null : s.persona === 'custom' ? customPersona(s.custom) : personaById(s.persona));
@@ -176,31 +176,27 @@ export default function App() {
     }
   }
   const overlay = pageAlert && <AlertPage alert={pageAlert} onAct={(x) => actOnAlert(pageAlert, x)} onDismiss={() => dismissAlert(pageAlert)} />;
-  // Alerts tab: opening it marks everything seen; the badge counts only new items, in the most severe colour.
-  const [alertsOpen, setAlertsOpen] = useState(false);
+  // Alerts page: while it's open, everything on it counts as seen; the badge counts only new items, in the most severe colour.
   const [fresh, setFresh] = useState([]);
   const bellList = alerts.filter((a) => !(session?.done ?? []).includes(bellKey(a)));
   const unseen = bellList.filter((a) => !(session?.bellSeen ?? []).includes(bellKey(a)));
   const badgeLevel = unseen.some((x) => x.level === 'urgent') ? 'urgent' : unseen.some((x) => x.level === 'warn') ? 'warn' : 'info';
-  const openAlerts = () => {
-    setFresh(unseen.map(bellKey));
-    markSeen(bellList.map(bellKey));
-    setAlertsOpen(true);
-  };
+  const unseenKeys = unseen.map(bellKey).join('|');
+  useEffect(() => {
+    if (section !== 'alerts') {
+      setFresh((f) => (f.length ? [] : f));
+      return;
+    }
+    if (!unseenKeys) return;
+    const keys = unseenKeys.split('|');
+    setFresh((f) => [...new Set([...f, ...keys])]);
+    markSeen(keys);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, unseenKeys]);
   const showTabs = session && section !== 'test' && section !== 'quick' && section !== 'about';
   const chrome = (
     <>
-      {showTabs && <TabBar section={section} go={go} onAlerts={openAlerts} badge={unseen.length} badgeLevel={badgeLevel} />}
-      {alertsOpen && (
-        <AlertsSheet
-          alerts={bellList}
-          fresh={fresh}
-          onDone={markDone}
-          onUndo={(k) => changeSession((prev) => ({ ...prev, done: (prev.done ?? []).filter((x) => x !== k) }))}
-          onAct={(x) => (x.event ? addEvent(x.event) : follow(x.to))}
-          onClose={() => setAlertsOpen(false)}
-        />
-      )}
+      {showTabs && <TabBar section={section} go={go} badge={section === 'alerts' ? 0 : unseen.length} badgeLevel={badgeLevel} />}
       {overlay}
     </>
   );
@@ -329,6 +325,15 @@ export default function App() {
         {earsTab === 'normal' && <IsThisNormal data={data} onStartTest={() => startTest('baseline')} />}
         {section === 'test' && <TestFlow key={sub} role={sub === 'baseline' ? 'baseline' : 'check'} data={data} onSave={saveTest} onDone={() => go('ears')} onOpenSudden={() => go('ears/sudden')} />}
         {section === 'quick' && <QuickCheck key={sub} kind={sub || 'general'} data={data} persona={persona} events={session.events ?? []} onSave={saveQuick} onSimulatedFullCheck={simulatedFullCheck} go={go} />}
+        {section === 'alerts' && (
+          <Alerts
+            alerts={bellList}
+            fresh={fresh}
+            onDone={markDone}
+            onUndo={(k) => changeSession((prev) => ({ ...prev, done: (prev.done ?? []).filter((x) => x !== k) }))}
+            onAct={(x) => (x.event ? addEvent(x.event) : follow(x.to))}
+          />
+        )}
         {section === 'plan' && <Planner key={sub ?? ''} plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} focus={sub} alerts={alerts} events={session.events ?? []} go={follow} />}
       </main>
       {chrome}

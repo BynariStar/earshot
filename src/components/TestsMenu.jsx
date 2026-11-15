@@ -1,6 +1,6 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
-// "Tests (n) ▾" in the top bar: one line per test, newest first; tap a line for its numbers or to delete it.
+// "Tests (n) ›" in the top bar opens a flyout from the right: one line per test, newest first; tap a line for its numbers or to delete it.
 import { useState } from 'react';
 import Sheet from './Sheet.jsx';
 import { averageBaselines, shifts, isNoResponse } from '../lib/rules.js';
@@ -9,7 +9,7 @@ import Info from './Info.jsx';
 
 const FREQS = [250, 500, 1000, 2000, 3000, 4000];
 const hz = (f) => (f >= 1000 ? `${f / 1000}k` : `${f}`);
-const hzLong = (f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`);
+const hzLong = (f) => (f >= 1000 ? `${f / 1000}\u00a0kHz` : `${f}\u00a0Hz`);
 
 function summary(t, reference) {
   if (t.role === 'baseline' || !reference) return null;
@@ -38,7 +38,7 @@ export default function TestsMenu({ data, onDelete }) {
         Tests ({tests.length}) <span aria-hidden="true">›</span>
       </button>
       {open && (
-        <Sheet title={`Tests (${tests.length})`} onClose={() => setOpen(false)}>
+        <Sheet side="right" title={`Tests (${tests.length})`} onClose={() => setOpen(false)}>
           {tests.length === 0 && <p className="muted small">No tests yet.</p>}
           {tests.map((t) => {
             const bIndex = baselines.findIndex((b) => b.id === t.id);

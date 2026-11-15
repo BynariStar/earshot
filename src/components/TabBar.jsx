@@ -14,7 +14,7 @@ const Icon = ({ name }) => (
   </svg>
 );
 
-export default function TabBar({ section, go, onAlerts, badge, badgeLevel }) {
+export default function TabBar({ section, go, badge, badgeLevel }) {
   const tab = (id, label, icon, onClick, active) => (
     <button key={id} className={`tab${active ? ' on' : ''}`} onClick={onClick} aria-current={active ? 'page' : undefined}>
       <span className="tab-icon">
@@ -29,7 +29,7 @@ export default function TabBar({ section, go, onAlerts, badge, badgeLevel }) {
       {tab('station', 'Station', 'station', () => go(''), !section || section === 'home')}
       {tab('plan', 'Today', 'plan', () => go('plan'), section === 'plan')}
       {tab('ears', 'My ears', 'ear', () => go('ears'), section === 'ears')}
-      {tab('alerts', 'Alerts', 'bell', onAlerts, false)}
+      {tab('alerts', 'Alerts', 'bell', () => go('alerts'), section === 'alerts')}
     </nav>
   );
 }

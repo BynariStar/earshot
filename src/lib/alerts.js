@@ -13,6 +13,7 @@ export const FAULT_RISE_DB = 8; // band rise used in the demo fault
 // Pitches a quick check should test after an exposure: the bands the noise hit, plus 4 kHz, where noise
 // damage usually shows first.
 export function quickPitchesFor(event) {
+  if (event?.pitches) return event.pitches;
   if (event?.type === 'fan-fault') {
     const sig = SIGNATURES.find((s) => s.id === FAULT_SIGNATURE);
     return [...new Set([...sig.bands.filter((b) => b >= 250 && b <= 4000), 4000])];
@@ -34,6 +35,7 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
   const fault = events.find((e) => e.type === 'fan-fault');
   const ringing = events.find((e) => e.type === 'ringing');
   const loud = events.find((e) => e.type === 'loud');
+  const live = events.find((e) => e.type === 'live');
 
   if (ringing) {
     const done = lastQuick && lastQuick.at > ringing.at;
@@ -52,7 +54,7 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
   }
 
   const wasThere = events.some((e) => e.type === 'was-there') || plan?.placesUsed?.includes(st.faultModule);
-  const exposure = loud ?? (fault && wasThere ? fault : null);
+  const exposure = loud ?? live ?? (fault && wasThere ? fault : null);
   if (exposure) {
     const done = lastQuick && lastQuick.at > exposure.at;
     if (!done) {
@@ -60,7 +62,7 @@ export function buildAlerts({ station, data, events, plan, planFlags, hearing, q
       out.push({
         id: 'exposure',
         level: 'warn',
-        title: loud ? 'Loud exposure today: treadmill without earplugs' : `You spent time in ${st.faultName} during the fault`,
+        title: loud ? 'Loud exposure today: treadmill without earplugs' : exposure === live ? `You were in ${live.where} during ${live.during}` : `You spent time in ${st.faultName} during the fault`,
         body: `Take a 2-minute check tonight at ${pitches.map(bandLabel).join(', ')}: the pitches that noise reaches. A change right after noise can be temporary, so Earshot rechecks tomorrow.`,
         actions: [{ label: 'Quick check', to: `quick/${exposure.type}` }],
       });

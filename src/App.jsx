@@ -13,6 +13,7 @@ import IsThisNormal from './components/IsThisNormal.jsx';
 import Tests from './components/Tests.jsx';
 import SuddenResponse from './components/SuddenResponse.jsx';
 import QuickCheck from './components/QuickCheck.jsx';
+import AlertPage from './components/AlertPage.jsx';
 import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan, applyFlags, normalize, DEFAULT_FILL, DEFAULT_SLEEP } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
@@ -99,6 +100,26 @@ export default function App() {
     ? buildAlerts({ station: session.station, data, events: session.events ?? [], plan: planResult, planFlags: flags.flagged, hearing, quick: data.quick ?? [] })
     : [];
 
+  // A new urgent or warning alert opens full screen once (not during a test, and not on the page it points to).
+  const alertKey = (a) => `${a.id}:${a.title}`;
+  const seen = session?.seen ?? [];
+  const busy = section === 'test' || section === 'quick' || section === 'welcome';
+  const pageAlert = busy
+    ? null
+    : alerts.find((a) => (a.level === 'urgent' || a.level === 'warn') && !seen.includes(alertKey(a)) && !a.actions.some((x) => x.to && x.to === route));
+  function dismissAlert(a) {
+    setSession({ ...session, seen: [...seen, alertKey(a)] });
+  }
+  function actOnAlert(a, x) {
+    const s1 = { ...session, seen: [...seen, alertKey(a)] };
+    if (x.event) setSession({ ...s1, events: [...(s1.events ?? []).filter((e) => e.type !== x.event.type), { ...x.event, at: Date.now() }] });
+    else {
+      setSession(s1);
+      go(x.to);
+    }
+  }
+  const overlay = pageAlert && <AlertPage alert={pageAlert} onAct={(x) => actOnAlert(pageAlert, x)} onDismiss={() => dismissAlert(pageAlert)} />;
+
   function start(s) {
     setSession(s);
     setData(dataFor(s.persona));
@@ -108,7 +129,7 @@ export default function App() {
     setSession({ ...session, events: [...(session.events ?? []).filter((x) => x.type !== e.type), { ...e, at: Date.now() }] });
   }
   function clearEvents() {
-    setSession({ ...session, events: [] });
+    setSession({ ...session, events: [], seen: [] });
     if (persona) {
       clearSim(session.persona);
       setData(dataFor(session.persona));
@@ -153,6 +174,7 @@ export default function App() {
           onReset={() => setData(dataFor(session.persona))}
         />
         <Footer />
+        {overlay}
       </div>
     );
   }
@@ -200,6 +222,7 @@ export default function App() {
         {section === 'plan' && <Planner plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} />}
       </main>
       <Footer />
+      {overlay}
     </div>
   );
 }

@@ -4,9 +4,11 @@
 // - ISS (schematic): "Average" = NASA's measured module averages (Allen 2024). "At the moment" = a
 //   SIMULATED day, because NASA doesn't publish live module levels: module averages plus two treadmill
 //   sessions (NASA's measured 84.5 dBA at the runner's head) and a sleep period.
+// - "Live" (ISS and bases): a SIMULATED feed of incidents NASA has reported, to show continuous
+//   monitoring (src/lib/live.js). The old "At the moment" is now "Over a day" (mode id 'now').
 // - NASA chamber (real data): the three floors of NASA's 1997 sealed-chamber test (LMLSTP 3.3).
 //   "Average" = each floor's 24-hour average; "At the moment" = the real minute-by-minute reading.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import iss from '../data/iss_modules.json';
 import lmlstp from '../data/lmlstp.json';
 import Station3D from './Station3D.jsx';
@@ -15,6 +17,7 @@ import { T2 } from '../lib/plan.js';
 import Spectrum from './Spectrum.jsx';
 import { faultDelta } from '../lib/spectrum.js';
 import { STATIONS } from '../lib/session.js';
+import { liveFrame, jitter, incidentDelta, incidentPitches } from '../lib/live.js';
 import { BASES, ATMOSPHERES, EXERCISE_SESSIONS, baseLevel, pressureDelta, SPEC_WORK_DBA, SPEC_SLEEP_DBA } from '../lib/bases.js';
 
 const byId = Object.fromEntries(iss.modules.map((m) => [m.id, m]));
@@ -82,9 +85,9 @@ function Segmented({ value, options, onChange, label }) {
   );
 }
 
-export default function Station({ lockedPlace, demoEvents = [], focus = null, compact = false }) {
+export default function Station({ lockedPlace, demoEvents = [], focus = null, compact = false, onEvent }) {
   const [place, setPlace] = useState(lockedPlace ?? 'iss');
-  const [mode, setMode] = useState(lockedPlace ? 'now' : 'avg');
+  const [mode, setMode] = useState(lockedPlace ? 'live' : 'avg');
   const [t, setT] = useState(() => {
     if (!lockedPlace) return 8 * 60 + 30;
     const d = new Date();
@@ -99,6 +102,15 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   const [atm, setAtm] = useState('8.2');
   const [fans, setFans] = useState('same-mass'); // realistic default: the same air mass must still move
 
+  // Live feed clock: seconds since the feed started.
+  const liveStart = useRef(Date.now());
+  const [liveS, setLiveS] = useState(0);
+  useEffect(() => {
+    if (mode !== 'live') return undefined;
+    const id = setInterval(() => setLiveS((Date.now() - liveStart.current) / 1000), 1000);
+    return () => clearInterval(id);
+  }, [mode]);
+
   useEffect(() => {
     if (!playing || mode !== 'now') return undefined;
     const id = setInterval(() => setT((x) => (x + 10) % 1440), 120);
@@ -107,10 +119,35 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
 
   const base = BASES[place];
   const parts = base ? base.parts : place === 'iss' ? ISS_PARTS : CHAMBER_PARTS;
-  const { levels, events, whys } = useMemo(
-    () => (base ? baseLevels(base, { basis, atm, fans, mode, t }) : place === 'iss' ? issLevels(mode, t) : chamberLevels(mode, t)),
-    [base, place, basis, atm, fans, mode, t]
+  const live = mode === 'live' && place !== 'chamber';
+  const calcMode = live ? 'avg' : mode;
+  const { levels: baseLv, events, whys } = useMemo(
+    () => (base ? baseLevels(base, { basis, atm, fans, mode: calcMode, t }) : place === 'iss' ? issLevels(calcMode, t) : chamberLevels(calcMode, t)),
+    [base, place, basis, atm, fans, calcMode, t]
   );
+  // Live: the loud-activity level for an area (ISS treadmill, or a base's exercise session).
+  const activityLevel = (id) => {
+    if (place === 'iss') return T2.dba;
+    const part = base.parts.find((x) => x.id === id);
+    return baseLevel(base, part, { basis, atm, fans, mode: 'now', t: EXERCISE_SESSIONS[0][0] }).dba;
+  };
+  const frame = live ? liveFrame(place, liveS) : { active: [], log: [] };
+  const specId = (id) => (base ? base.parts.find((x) => x.id === id)?.iss ?? id : id);
+  const levels = useMemo(() => {
+    if (!live) return baseLv;
+    const out = {};
+    parts.forEach((p, n) => {
+      const v = baseLv[p.id];
+      out[p.id] = Number.isFinite(v) ? v + jitter(liveS, n) : v;
+    });
+    for (const inc of frame.active) {
+      if (!Number.isFinite(out[inc.part])) continue;
+      out[inc.part] = inc.kind === 'activity' ? activityLevel(inc.part) + jitter(liveS, 99) : out[inc.part] + incidentDelta(inc, specId(inc.part));
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseLv, live, liveS, parts]);
+  const activeOn = (id) => frame.active.find((x) => x.part === id);
   // A demo fault raises one module's noise in the fault signature's bands.
   const faultModule = demoEvents.some((e) => e.type === 'fan-fault') ? STATIONS[place]?.faultModule : null;
   const levels2 = useMemo(() => {
@@ -118,6 +155,17 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
     return { ...levels, [faultModule]: levels[faultModule] + faultDelta(faultModule) };
   }, [levels, faultModule]);
   const sel = parts.find((p) => p.id === selected);
+  const highlights = [faultModule, ...frame.active.map((x) => x.part)].filter(Boolean);
+  const nowClock = (secAgo = 0) => new Date(Date.now() - secAgo * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const partLabel = (id) => parts.find((p) => p.id === id)?.label ?? id;
+  const selInc = sel && live ? activeOn(sel.id) : null;
+  const incidentBox = selInc ? <LiveIncident inc={selInc} since={nowClock(liveS - selInc.since)} label={sel.label} onEvent={onEvent} /> : null;
+  // The fault shown in a module's spectrum: the demo fault, or a live incident there.
+  const faultFor = (id) => {
+    if (id === faultModule) return true;
+    const inc = activeOn(id);
+    return inc?.kind === 'fault' ? { signature: inc.signature, rise: inc.rise } : null;
+  };
   const pick = (id) => setSelected(id);
 
   return (
@@ -126,14 +174,14 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
         <Segmented
           label="Place"
           value={place}
-          onChange={(v) => { setPlace(v); setSelected(null); if (BASES[v]) setAtm(BASES[v].defaultAtm); }}
+          onChange={(v) => { setPlace(v); setSelected(null); if (BASES[v]) setAtm(BASES[v].defaultAtm); if (v === 'chamber' && mode === 'live') setMode('avg'); }}
           options={[['iss', 'ISS'], ['moon', 'Moon base'], ['mars', 'Mars base'], ['chamber', 'NASA chamber (real data)']]}
         />
-        <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={[['avg', 'Average'], ['now', 'At the moment']]} />
+        <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={place === 'chamber' ? [['avg', 'Average'], ['now', 'Over a day']] : [['avg', 'Average'], ['now', 'Over a day'], ['live', 'Live']]} />
       </div>}
       {lockedPlace && (
         <div className="station-controls">
-          <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={[['now', 'At the moment'], ['avg', 'Average']]} />
+          <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={[['live', 'Live'], ['now', 'Over a day'], ['avg', 'Average']]} />
         </div>
       )}
 
@@ -162,7 +210,13 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
         </div>
       )}
 
-      {!compact && <p className="muted provenance">
+      {live && (
+        <p className="muted provenance small">
+          <span className="live-dot" aria-hidden="true" /> <strong>Live feed, simulated.</strong> NASA doesn't publish live module levels, so this replays a loop of
+          incidents NASA has reported on the ISS (a stalled fan, a faster pump, a low hum) on top of the {place === 'iss' ? 'measured averages' : 'simulated averages'}, to show how Earshot would respond.
+        </p>
+      )}
+      {!compact && !live && <p className="muted provenance">
         {place === 'iss' && mode === 'avg' && "NASA's measured average for each module (Allen 2024, ICES-2024-354). Grey: no dBA value published (Unity and the Quest airlock are reported only as meeting NASA's NC-50 limit)."}
         {place === 'iss' && mode === 'now' && 'Simulated day. NASA publishes module averages, not live levels. Fans and pumps run around the clock, so modules change little hour to hour; the big swings come from crew activities. This day adds two treadmill hours and a sleep period to the measured averages.'}
         {base && (
@@ -188,17 +242,51 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           decor={base ? base.decor : place === 'iss' ? 'iss' : 'none'}
           camera={base ? base.camera : place === 'iss' ? [52, 40, 66] : [13, 11, 15]}
           target={base ? base.target : place === 'iss' ? [-5, -3, 0] : [0, 3, 0]}
-          highlight={faultModule ?? (base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined)}
+          highlight={live ? highlights : faultModule ?? (base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined)}
         />
         <aside className="station-panel">
-          {events.map((e) => <p key={e.text} className="event">{e.text}</p>)}
-          {faultModule && <p className="event">{STATIONS[place].faultName}: {faultDelta(faultModule) > 0 ? '+' : ''}{faultDelta(faultModule).toFixed(1)} dB right now. Tap it for the likely source.</p>}
+          {!live && events.map((e) => <p key={e.text} className="event">{e.text}</p>)}
+          {frame.active.filter((inc) => inc.part !== selected).map((inc) => {
+            const d = levels[inc.part] - baseLv[inc.part];
+            return (
+              <button key={inc.key} className="event event-alert" onClick={() => pick(inc.part)}>
+                <span className="event-dot" aria-hidden="true" />
+                <span>
+                  <strong>{partLabel(inc.part)}: {inc.what}</strong>
+                  <span className="event-sub">{inc.kind === 'activity' ? `${levels[inc.part].toFixed(1)} dBA` : `+${d.toFixed(1)} dBA`} · since {nowClock(liveS - inc.since)}</span>
+                  <span className="event-cta">{inc.kind === 'activity' ? 'See the level ›' : 'See the likely source ›'}</span>
+                </span>
+              </button>
+            );
+          })}
+          {faultModule && selected !== faultModule && (
+            <button className="event event-alert" onClick={() => pick(faultModule)}>
+              <span className="event-dot" aria-hidden="true" />
+              <span>
+                <strong>{STATIONS[place].faultName} is {faultDelta(faultModule).toFixed(1)} dBA louder than normal</strong>
+                <span className="event-cta">See the likely source ›</span>
+              </span>
+            </button>
+          )}
           {sel && base ? (
-            <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} atm={atm} basis={basis} fault={sel.id === faultModule} />
+            <BaseDetail part={sel} level={levels2[sel.id]} why={whys[sel.id]} atm={atm} basis={basis} fault={faultFor(sel.id)} live={live} incident={incidentBox} />
           ) : sel ? (
-            <ModuleDetail part={sel} level={levels2[sel.id]} place={place} mode={mode} fault={sel.id === faultModule} />
+            <ModuleDetail part={sel} level={levels2[sel.id]} place={place} mode={live ? 'live' : mode} fault={faultFor(sel.id)} incident={incidentBox} />
           ) : (
             <p className="muted">Drag to turn, pinch or scroll to zoom, and tap {place === 'chamber' ? 'a floor' : place === 'iss' ? 'a module' : 'an area'} for details.</p>
+          )}
+          {live && frame.log.length > 0 && (
+            <div className="live-log">
+              <h4>Feed</h4>
+              <ul>
+                {frame.log.map((e) => (
+                  <li key={`${e.key}-${e.type}`} className={e.type}>
+                    <span className="muted">{nowClock(liveS - e.at)}</span>{' '}
+                    <button className="link-button inline-link" onClick={() => pick(e.inc.part)}>{partLabel(e.inc.part)}</button>: {e.type === 'start' ? e.inc.what : `${e.inc.fix}, back to normal`}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <div className="legend3d">
             {NOISE_BINS.map((b) => (
@@ -224,7 +312,25 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   );
 }
 
-function BaseDetail({ part, level, why, atm, basis, fault }) {
+// A live incident in the selected area: what happened, and "I was in there" to start a targeted check.
+function LiveIncident({ inc, since, label, onEvent }) {
+  const [told, setTold] = useState(false);
+  const pitches = incidentPitches(inc);
+  return (
+    <div className="live-incident">
+      <p><strong>{inc.what[0].toUpperCase() + inc.what.slice(1)}</strong> since {since}.{inc.illustrative ? ' Illustrative: NASA reported this fault elsewhere on the ISS.' : ''}</p>
+      {onEvent && (told ? (
+        <p className="small">Noted. Earshot added a quick check to your home screen.</p>
+      ) : (
+        <button className="secondary" onClick={() => { onEvent({ type: 'live', where: label, what: inc.what, during: inc.during, pitches }); setTold(true); }}>
+          I was in there
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BaseDetail({ part, level, why, atm, basis, fault, live, incident }) {
   const d = pressureDelta(atm);
   return (
     <div className="module-detail">
@@ -232,11 +338,12 @@ function BaseDetail({ part, level, why, atm, basis, fault }) {
       <p className="muted">{part.contains}</p>
       {Number.isFinite(level) ? (
         <p className="level" style={{ color: noiseColor(level) }}>
-          {level.toFixed(1)} dBA <span className="muted">simulated</span>
+          {level.toFixed(1)} dBA <span className="muted">{live ? 'live (simulated)' : 'simulated'}</span>
         </p>
       ) : (
         <p className="muted">No value.</p>
       )}
+      {incident}
       <p className="small">{why}</p>
       <Spectrum id={part.id} fault={fault} />
       {atm !== '14.7' && (
@@ -254,7 +361,7 @@ function BaseDetail({ part, level, why, atm, basis, fault }) {
   );
 }
 
-function ModuleDetail({ part, level, place, mode, fault }) {
+function ModuleDetail({ part, level, place, mode, fault, incident }) {
   const m = byId[part.id];
   const sleepers = SLEEP_IN[part.id] ?? [];
   return (
@@ -264,11 +371,12 @@ function ModuleDetail({ part, level, place, mode, fault }) {
         <p className="muted">Connecting passage; no separate noise value.</p>
       ) : Number.isFinite(level) ? (
         <p className="level" style={{ color: noiseColor(level) }}>
-          {level.toFixed(1)} dBA <span className="muted">{mode === 'avg' ? (place === 'iss' ? 'measured average' : '24-hour average') : place === 'iss' ? 'simulated now' : 'this minute'}</span>
+          {level.toFixed(1)} dBA <span className="muted">{mode === 'live' ? 'live (simulated)' : mode === 'avg' ? (place === 'iss' ? 'measured average' : '24-hour average') : place === 'iss' ? 'simulated, this time of day' : 'this minute'}</span>
         </p>
       ) : (
         <p className="muted">No dBA value published (reported only as meeting NASA's NC-50 limit, or not measured).</p>
       )}
+      {incident}
       {m?.date && <p className="muted">NASA survey of {m.date}</p>}
       {place === 'iss' && !part.struct && <Spectrum id={part.id} fault={fault} />}
       {sleepers.length > 0 && (

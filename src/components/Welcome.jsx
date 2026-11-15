@@ -34,24 +34,28 @@ export default function Welcome({ onStart, initial }) {
         ))}
       </div>
 
-      <h2>Who are you?</h2>
+      <h2>Me</h2>
       <div className="choice-grid">
         <button className={`choice own${persona === 'own' ? ' on' : ''}`} onClick={() => setPersona('own')}>
-          <strong>Me: take my own baseline</strong>
+          <strong>Take my own baseline</strong>
           <span className="muted small">Real tests on your own wired headphones in a quiet room. Two baseline tests of about 8 minutes, then everything adapts to your ears. Results stay on this device.</span>
         </button>
+      </div>
+
+      <h2>Or choose a simulation</h2>
+      <p className="muted small section-note">Four crew members built from NASA's published hearing statistics. They aren't real people.</p>
+      <div className="choice-grid">
         {PERSONAS.map((p) => (
           <button key={p.id} className={`choice${persona === p.id ? ' on' : ''}`} onClick={() => setPersona(p.id)}>
             <strong>{p.name} · {p.tag}</strong>
             <span className="muted small">{p.story}</span>
-            <span className="badge sim">Simulated</span>
           </button>
         ))}
       </div>
 
       <div className="welcome-go">
         <button className="primary" onClick={() => onStart({ station, persona, events: [] })}>Start</button>
-        <span className="muted small">Simulated crew members are built from NASA's published statistics; they aren't real people. Use the Demo menu inside to trigger events.</span>
+        <span className="muted small">With a simulation, use the Demo menu inside to trigger events.</span>
       </div>
     </div>
   );

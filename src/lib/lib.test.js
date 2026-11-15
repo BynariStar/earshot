@@ -304,3 +304,28 @@ describe('active monitoring', () => {
     expect(simulatedThresholds(d, [{ type: 'ringing' }]).right[3000] - simulatedThresholds(d, []).right[3000]).toBeGreaterThanOrEqual(30);
   });
 });
+
+import { liveFrame, incidentPitches, INCIDENTS, CYCLE_S } from './live.js';
+describe('live feed (simulated)', () => {
+  it('replays overlapping incidents on a loop and logs them newest first', () => {
+    const f = liveFrame('iss', 20);
+    expect(f.active.map((x) => x.part)).toEqual(['node2', 'node3']);
+    expect(f.log[0].inc.part).toBe('node3');
+    const later = liveFrame('iss', CYCLE_S + 20);
+    expect(later.active.map((x) => x.part)).toEqual(['node2', 'node3']);
+    expect(later.log.some((e) => e.type === 'end')).toBe(true);
+  });
+  it('every incident sits on a part of its station, and checks test the pitches the noise reaches', () => {
+    for (const st of ['iss', 'moon', 'mars']) expect(INCIDENTS[st]).toHaveLength(5);
+    expect(incidentPitches(INCIDENTS.iss[0])).toEqual([500, 1000, 4000]);
+    expect(incidentPitches(INCIDENTS.iss[3])).toEqual([250, 500, 1000]);
+    expect(incidentPitches(INCIDENTS.iss[1])).toEqual([2000, 3000, 4000]);
+  });
+  it('an "I was in there" during a live incident raises an exposure alert with a targeted check', () => {
+    const data = { tests: [], quick: [] };
+    const a = buildAlerts({ station: 'iss', data, events: [{ type: 'live', where: 'Node 2 (Harmony)', during: 'a stalled ventilation fan', pitches: [500, 1000, 4000], at: 1 }], plan: null, planFlags: [], hearing: null, quick: [] });
+    const ex = a.find((x) => x.id === 'exposure');
+    expect(ex.title).toBe('You were in Node 2 (Harmony) during a stalled ventilation fan');
+    expect(ex.actions[0].to).toBe('quick/live');
+  });
+});

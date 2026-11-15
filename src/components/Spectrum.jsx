@@ -5,19 +5,21 @@
 import { BANDS, spectrumOf, sourceNote, dominantBands, withFault, likelySource, bandLabel, SIGNATURES } from '../lib/spectrum.js';
 import { FAULT_SIGNATURE, FAULT_RISE_DB } from '../lib/alerts.js';
 
+// fault: true (the demo fault), { signature, rise } (a live incident), or nothing.
 export default function Spectrum({ id, fault }) {
+  const f = fault === true ? { signature: FAULT_SIGNATURE, rise: FAULT_RISE_DB } : fault || null;
   const sp = spectrumOf(id);
-  const sig = SIGNATURES.find((s) => s.id === FAULT_SIGNATURE);
+  const sig = SIGNATURES.find((s) => s.id === (f?.signature ?? FAULT_SIGNATURE));
   if (!sp) {
-    return fault ? (
+    return f ? (
       <div className="spectrum">
         <h4>Where it's coming from</h4>
         <p className="small">Likely source: <strong>{sig.name.toLowerCase()}</strong>, from the rise at {sig.bands.map(bandLabel).join(' and ')}. {sig.basis}</p>
       </div>
     ) : null;
   }
-  const now = fault ? withFault(sp.bands, FAULT_SIGNATURE, FAULT_RISE_DB) : sp.bands;
-  const src = fault ? likelySource(sp.bands, now) : null;
+  const now = f ? withFault(sp.bands, f.signature, f.rise) : sp.bands;
+  const src = f ? likelySource(sp.bands, now) : null;
   const dom = dominantBands(now);
   const W = 300, H = 130, L = 26, B = 22, T = 8;
   const lo = 20, hi = 85;
@@ -42,7 +44,7 @@ export default function Spectrum({ id, fault }) {
               <rect x={x} y={Y(sp.bands[i])} width={bw - 6} height={H - B - Y(sp.bands[i])} rx="3" className={sp.kind === 'nc' ? 'bar-envelope' : 'bar'}>
                 <title>{`${bandLabel(b)}: ${sp.bands[i]} dB${sp.kind === 'nc' ? ' (upper bound)' : ''}`}</title>
               </rect>
-              {fault && now[i] > sp.bands[i] && (
+              {f && now[i] > sp.bands[i] && (
                 <rect x={x} y={top} width={bw - 6} height={base - top} rx="3" className="bar-fault">
                   <title>{`${bandLabel(b)} now: ${now[i]} dB (+${(now[i] - sp.bands[i]).toFixed(0)} dB)`}</title>
                 </rect>

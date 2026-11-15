@@ -62,7 +62,7 @@ export const personaById = (id) => PERSONAS.find((p) => p.id === id) ?? null;
 // The simulated crew member's thresholds right now, given today's events (for a simulated quick check).
 export function simulatedThresholds(persona, events = []) {
   let t = add(BASE, persona.truth);
-  if (events.some((e) => e.type === 'loud' || e.type === 'fan-fault') && persona.afterNoise) t = add(t, persona.afterNoise);
+  if (events.some((e) => e.type === 'loud' || e.type === 'fan-fault' || e.type === 'live') && persona.afterNoise) t = add(t, persona.afterNoise);
   if (events.some((e) => e.type === 'ringing') && persona.afterRinging) t = add(t, persona.afterRinging);
   return t;
 }

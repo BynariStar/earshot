@@ -15,11 +15,12 @@ const WHY = {
   'fan-fault': 'the stalled-fan noise rose at 500 Hz and 1 kHz; 4 kHz is where noise damage usually shows first',
   loud: 'treadmill noise reaches the 2 to 4 kHz region, where noise damage usually shows first',
   ringing: 'ringing often comes with a change at 1 to 4 kHz',
+  live: 'the pitches the noise you were in reaches, plus 4 kHz, where noise damage usually shows first',
   general: 'a quick sweep across low, middle and high pitches',
 };
 
 export default function QuickCheck({ kind, data, persona, events, onSave, onSimulatedFullCheck, go }) {
-  const pitches = kind === 'general' ? [500, 1000, 2000, 4000] : quickPitchesFor({ type: kind });
+  const pitches = kind === 'general' ? [500, 1000, 2000, 4000] : quickPitchesFor(events.find((e) => e.type === kind) ?? { type: kind });
   const baselines = baselineTests(data);
   const ref = baselines.length >= 2 ? averageBaselines(baselines[0].thresholds, baselines[1].thresholds) : null;
   const [stage, setStage] = useState('intro');

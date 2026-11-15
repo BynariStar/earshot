@@ -64,7 +64,7 @@ export default function StationHome({ session, persona, alerts, go, focus, onEve
       </nav>
 
       <Suspense fallback={<p className="muted">Loading the station…</p>}>
-        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact />
+        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact onEvent={onEvent} />
       </Suspense>
       <p className="small"><button className="link-button inline-link" onClick={() => go('station')}>Full station view</button>: every place, NASA's real chamber data, base settings and cabin pressure.</p>
 

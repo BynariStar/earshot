@@ -375,6 +375,7 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 /* Start screen and live home */
 .welcome { padding: 22px 0 10px; }
 .welcome h2 { font-size: 1.1rem; margin: 22px 0 10px; }
+.welcome .section-note { margin: -4px 0 10px; }
 .choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .choice-grid.three { grid-template-columns: repeat(3, 1fr); }
 .choice { text-align: left; display: flex; flex-direction: column; gap: 6px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; cursor: pointer; }
@@ -404,3 +405,44 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 .action:hover { border-color: var(--accent); }
 .quick-result h2 { margin-top: 0; }
 @media (max-width: 700px) { .choice-grid.three, .quick-actions { grid-template-columns: 1fr; } }
+
+/* Station alert inside the map panel: clickable, with a pulsing dot that matches the flashing module. */
+.event-alert { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.event-alert strong { display: block; }
+.event-alert .event-cta { display: block; color: var(--accent); font-size: 0.9rem; margin-top: 2px; }
+.event-alert:hover .event-cta { text-decoration: underline; }
+.event-dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: var(--urgent); animation: event-pulse 1.6s ease-in-out infinite; }
+@keyframes event-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--urgent) 60%, transparent); } 50% { box-shadow: 0 0 0 7px transparent; } }
+/* "This turns" hint over the 3D view. */
+.station3d { position: relative; }
+.hint3d { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 0.8rem; background: color-mix(in srgb, var(--bg, #0b0e14) 80%, transparent); border: 1px solid var(--border); pointer-events: none; transition: opacity 0.5s; }
+.hint3d.gone { opacity: 0; }
+.hint3d-icon { display: inline-block; font-size: 1rem; animation: hint-turn 2.4s ease-in-out infinite; }
+@keyframes hint-turn { 0%, 100% { transform: rotate(-35deg); } 50% { transform: rotate(35deg); } }
+@media (prefers-reduced-motion: reduce) { .event-dot, .hint3d-icon { animation: none; } }
+
+/* Live feed */
+.event-alert .event-sub { display: block; font-size: 0.85rem; opacity: 0.85; }
+.station-panel .event-alert + .event-alert { margin-top: 8px; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--urgent); vertical-align: middle; animation: event-pulse 1.6s ease-in-out infinite; }
+.live-log h4 { margin: 14px 0 6px; }
+.live-log ul { list-style: none; padding: 0; margin: 0; font-size: 0.85rem; }
+.live-log li { padding: 3px 0; border-top: 1px solid var(--border); }
+.live-log li.end { opacity: 0.7; }
+.live-incident { border: 1px solid var(--urgent); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; background: rgba(235, 87, 87, 0.08); }
+.live-incident p { margin: 0 0 8px; }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+/* Full-screen alert */
+.alert-page { color: var(--text); position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(6px); animation: alert-in 0.25s ease-out; }
+.alert-page-card { width: min(560px, 100%); border-radius: 18px; padding: 28px 26px 20px; background: var(--surface); border: 2px solid var(--watch); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.alert-page.level-urgent .alert-page-card { border-color: var(--urgent); }
+.alert-page-level { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.85rem; color: var(--watch); }
+.alert-page.level-urgent .alert-page-level { color: var(--urgent); }
+.alert-page-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 2px solid currentColor; font-size: 1rem; animation: event-pulse 1.6s ease-in-out infinite; }
+.alert-page h2 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 10px; }
+.alert-page-actions { display: flex; flex-direction: column; gap: 10px; margin: 20px 0 12px; }
+.alert-page-actions button { width: 100%; padding: 12px 16px; font-size: 1rem; }
+@keyframes alert-in { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .alert-page, .alert-page-icon { animation: none; } }
+.alert.warn { color: var(--text); }

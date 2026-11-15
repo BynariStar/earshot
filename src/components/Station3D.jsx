@@ -68,6 +68,12 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
   onSelectRef.current = onSelect;
   const levelsRef = useRef(levels);
   levelsRef.current = levels;
+  const hiList = Array.isArray(highlight) ? highlight : highlight ? [highlight] : [];
+  const hiKey = hiList.join(',');
+  const highlightRef = useRef(hiList);
+  highlightRef.current = hiList;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
   // Build the scene once per part list.
   useEffect(() => {
@@ -104,11 +110,15 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     const controls = new OrbitControls(cam, renderer.domElement);
     controls.target.set(...target);
     controls.enableDamping = true;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.6;
     controls.minDistance = 12;
     controls.maxDistance = 180;
-    controls.addEventListener('start', () => (controls.autoRotate = false));
+
+    // A static view; a hint shows that it turns, and goes away once the user does.
+    const hint = document.createElement('div');
+    hint.className = 'hint3d';
+    hint.innerHTML = '<span class="hint3d-icon" aria-hidden="true">⟲</span> Drag to rotate · scroll or pinch to zoom';
+    mount.appendChild(hint);
+    controls.addEventListener('start', () => hint.classList.add('gone'));
 
     // Tap / click to select (ignore drags).
     const ray = new THREE.Raycaster();
@@ -151,8 +161,13 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     renderer.domElement.addEventListener('pointermove', onMove);
     renderer.domElement.addEventListener('pointerleave', onLeave);
 
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     let raf;
-    const loop = () => {
+    const loop = (now = 0) => {
+      for (const hi of highlightRef.current) {
+        const m = meshes[hi];
+        if (m && hi !== selectedRef.current) m.material.emissiveIntensity = still ? 0.6 : 0.15 + 0.6 * (0.5 + 0.5 * Math.sin(now / 260));
+      }
       controls.update();
       renderer.render(scene, cam);
       raf = requestAnimationFrame(loop);
@@ -178,6 +193,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerleave', onLeave);
       tip.remove();
+      hint.remove();
       scene.traverse((o) => {
         o.geometry?.dispose?.();
         o.material?.dispose?.();
@@ -196,11 +212,12 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       const c = p.struct ? STRUCT_COLOR : noiseColor(levels[p.id]);
       m.material.color.set(c);
       const isSel = selected === p.id;
-      const isHi = highlight && highlight === p.id;
+      const isHi = hiList.includes(p.id);
       m.material.emissive.set(isSel ? '#ffffff' : isHi ? c : '#000000');
       m.material.emissiveIntensity = isSel ? 0.28 : isHi ? 0.6 : 0;
     }
-  }, [parts, levels, selected, highlight]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parts, levels, selected, hiKey]);
 
   return <div className="station3d" ref={mountRef} />;
 }

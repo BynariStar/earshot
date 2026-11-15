@@ -1,19 +1,62 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
-import { useState } from 'react';
+// App shell: a home screen of section cards; each section opens full screen with a back arrow.
+// Routes live in the URL hash (#/ears, #/station, ...) so the phone's back button works like an app's.
+import { Suspense, lazy, useEffect, useState } from 'react';
+import Hub from './components/Hub.jsx';
 import Home from './components/Home.jsx';
 import TestFlow from './components/TestFlow.jsx';
-import Station from './components/Station.jsx';
-import About from './components/About.jsx';
+import Planner from './components/Planner.jsx';
 import IsThisNormal from './components/IsThisNormal.jsx';
 import Tests from './components/Tests.jsx';
 import { load, save, clearAll, withoutTest } from './lib/storage.js';
+import { loadPlan, savePlan, computePlan } from './lib/plan.js';
 import { demoState } from './lib/demo.js';
 import './App.css';
 
+// The 3D station pulls in three.js; load it only when that section opens.
+const Station = lazy(() => import('./components/Station.jsx'));
+
+const readRoute = () => window.location.hash.replace(/^#\/?/, '');
+
+function useRoute() {
+  const [route, setRoute] = useState(readRoute);
+  useEffect(() => {
+    const on = () => {
+      setRoute(readRoute());
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  const go = (r) => {
+    window.location.hash = r ? `/${r}` : '/';
+  };
+  return [route, go];
+}
+
+const TITLES = { ears: 'My ears', station: 'Station noise', plan: 'Plan a workday', test: 'Hearing test' };
+
 export default function App() {
   const [data, setData] = useState(load);
-  const [view, setView] = useState({ name: 'home' });
+  const [plan, setPlanState] = useState(loadPlan);
+  const [route, go] = useRoute();
+  const [section, sub] = route.split('/');
+
+  const setPlan = (p) => {
+    setPlanState(p);
+    savePlan(p);
+  };
+
+  // The "Is this normal?" noise comparison reads the planned day.
+  useEffect(() => {
+    const { work } = computePlan(plan);
+    try {
+      localStorage.setItem('earshot.plannedDay', JSON.stringify({ leqDba: work.leqDba, status: work.status }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [plan]);
 
   function saveTest(test, profilePatch) {
     setData((d) => {
@@ -22,7 +65,6 @@ export default function App() {
       return next;
     });
   }
-
   function deleteTest(id) {
     setData((d) => {
       const next = withoutTest(d, id);
@@ -30,59 +72,73 @@ export default function App() {
       return next;
     });
   }
-
+  function loadDemo() {
+    const d = demoState();
+    save(d);
+    setData(d);
+  }
   function exitDemo() {
     clearAll();
     setData(load());
   }
+  const startTest = (role) => go(`test/${role}`);
 
-  const nav = [
-    ['home', 'My ears'],
-    ['tests', 'My tests'],
-    ['normal', 'Is this normal?'],
-    ['station', 'Station noise'],
-    ['about', 'Sources'],
-  ];
+  if (!section || !TITLES[section]) {
+    return (
+      <div className="app">
+        <Hub data={data} plan={plan} go={go} onStartTest={startTest} onLoadDemo={loadDemo} onExitDemo={exitDemo} onReset={() => setData(load())} />
+        <Footer />
+      </div>
+    );
+  }
+
+  const back = section === 'test' ? () => go('ears') : () => go('');
+  const earsTab = section === 'ears' ? sub || 'overview' : null;
 
   return (
     <div className="app">
-      <header className="topbar">
-        <button className="brand" onClick={() => setView({ name: 'home' })}>
-          <img className="brand-mark" src="./favicon.svg" alt="" aria-hidden="true" />
-          Earshot
+      <header className="appbar">
+        <button className="back" onClick={back} aria-label="Back">
+          <span aria-hidden="true">‹</span>
         </button>
-        <nav>
-          {nav.map(([name, label]) => (
-            <button key={name} className={view.name === name ? 'nav on' : 'nav'} onClick={() => setView({ name })}>
+        <h1>{TITLES[section]}</h1>
+        {section === 'ears' && <span className="badge personal">Personal</span>}
+      </header>
+
+      {section === 'ears' && (
+        <div className="segmented tabs-ears" role="tablist" aria-label="My ears">
+          {[['overview', 'Overview'], ['tests', 'My tests'], ['normal', 'Is this normal?']].map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={earsTab === k} className={earsTab === k ? 'on' : ''} onClick={() => go(k === 'overview' ? 'ears' : `ears/${k}`)}>
               {label}
             </button>
           ))}
-        </nav>
-      </header>
+        </div>
+      )}
+
       <main>
-        {view.name === 'home' && (
-          <Home
-            data={data}
-            onStartTest={(role) => setView({ name: 'test', role })}
-            onLoadDemo={() => {
-              const d = demoState();
-              save(d);
-              setData(d);
-            }}
-            onOpenNormal={() => setView({ name: 'normal' })}
-            onExitDemo={exitDemo}
-          />
+        {earsTab === 'overview' && (
+          <Home data={data} onStartTest={startTest} onLoadDemo={loadDemo} onOpenNormal={() => go('ears/normal')} onExitDemo={exitDemo} />
         )}
-        {view.name === 'test' && <TestFlow role={view.role} data={data} onSave={saveTest} onDone={() => setView({ name: 'home' })} />}
-        {view.name === 'normal' && <IsThisNormal data={data} onStartTest={() => setView({ name: 'test', role: 'baseline' })} />}
-        {view.name === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={(role) => setView({ name: 'test', role })} />}
-        {view.name === 'station' && <Station />}
-        {view.name === 'about' && <About data={data} onReset={() => setData(load())} />}
+        {earsTab === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={startTest} />}
+        {earsTab === 'normal' && <IsThisNormal data={data} onStartTest={() => startTest('baseline')} />}
+        {section === 'test' && <TestFlow key={sub} role={sub === 'baseline' ? 'baseline' : 'check'} data={data} onSave={saveTest} onDone={() => go('ears')} />}
+        {section === 'station' && (
+          <Suspense fallback={<p className="muted">Loading the station…</p>}>
+            <Station />
+          </Suspense>
+        )}
+        {section === 'plan' && <Planner plan={plan} setPlan={setPlan} />}
       </main>
-      <footer className="footer">
-        Research prototype for NASA Space Apps 2026, not a medical device. Your results stay on this device. AI-assisted: code largely written
-        with Claude (Anthropic), reviewed by team Earshot.
-      </footer>
+      <Footer />
     </div>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="footer">
+      Research prototype for NASA Space Apps 2026, not a medical device. Your results stay on this device. AI-assisted: code largely written with
+      Claude (Anthropic), reviewed by team Earshot.
+    </footer>
   );
 }

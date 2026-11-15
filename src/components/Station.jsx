@@ -1,201 +1,218 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
+// Station noise in 3D. Two places and two modes:
+// - ISS (schematic): "Average" = NASA's measured module averages (Allen 2024). "At the moment" = a
+//   SIMULATED day, because NASA doesn't publish live module levels: module averages plus two treadmill
+//   sessions (NASA's measured 84.5 dBA at the runner's head) and a sleep period.
+// - NASA chamber (real data): the three floors of NASA's 1997 sealed-chamber test (LMLSTP 3.3).
+//   "Average" = each floor's 24-hour average; "At the moment" = the real minute-by-minute reading.
 import { useEffect, useMemo, useState } from 'react';
 import iss from '../data/iss_modules.json';
 import lmlstp from '../data/lmlstp.json';
-import { dose, withProtection, workdayStatus, sleepStatus, biggestContributors, LIMITS, EARPLUG_EFFECTIVE_DB } from '../lib/noise.js';
+import Station3D from './Station3D.jsx';
+import { ISS_PARTS, SLEEP_IN, T2_MODULE, NOISE_BINS, NO_DATA_COLOR, noiseColor } from '../lib/issLayout.js';
+import { T2 } from '../lib/plan.js';
 
-const sleepModules = iss.modules.filter((m) => m.kind === 'sleep');
-const t2 = iss.activities.find((a) => a.id === 't2');
+const byId = Object.fromEntries(iss.modules.map((m) => [m.id, m]));
+const CHAMBER_PARTS = lmlstp.floors.map((f, i) => ({ id: `floor${i}`, label: f.floor, axis: 'y', pos: [0, i * 3.1, 0], len: 2.9, r: 3.05 }));
 
-// Colour scale for module levels, anchored to NASA limits (sleep target 50, recommend protection 60).
-function levelClass(dba) {
-  if (dba >= 65) return 'lvl-high';
-  if (dba >= 60) return 'lvl-mid';
-  if (dba > 50) return 'lvl-low';
-  return 'lvl-quiet';
-}
-
-const STATUS = {
-  ok: { text: 'Under 60 dBA: no protection needed', cls: 'ok' },
-  'protection-recommended': { text: 'Over 60 dBA: protection recommended during loud activities', cls: 'watch' },
-  'protection-required': { text: 'Over 72 dBA: hearing protection required (Flight Rule B13-152)', cls: 'urgent' },
-  restful: { text: 'At or under 50 dBA: restful sleep', cls: 'ok' },
-  'above-sleep-target': { text: 'Above the 50 dBA sleep target, but still hearing rest (≤ 62 dBA)', cls: 'watch' },
-  'no-hearing-rest': { text: 'Over 62 dBA: no hearing rest tonight', cls: 'urgent' },
+// Simulated crew day (clock minutes). Treadmill times and sleep period are illustrative.
+const T2_SESSIONS = [[8 * 60, 9 * 60], [15 * 60, 16 * 60]];
+const SLEEP = [21 * 60 + 30, 6 * 60]; // wraps midnight
+const inRange = (t, [a, b]) => (a <= b ? t >= a && t < b : t >= a || t < b);
+const clock = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const startMinute = (iso) => {
+  const [h, m] = iso.split('T')[1].split(':').map(Number);
+  return h * 60 + m;
 };
 
-const DEFAULT_DAY = { lab: 4, cof: 2, node3: 2, sm: 4, mlm: 1, node2: 2, cupola: 0, jem: 0 };
+function issLevels(mode, t) {
+  const out = Object.fromEntries(ISS_PARTS.map((p) => [p.id, byId[p.id]?.dba ?? null]));
+  const events = [];
+  if (mode === 'now') {
+    if (T2_SESSIONS.some((r) => inRange(t, r))) {
+      out[T2_MODULE] = T2.dba;
+      events.push({ id: T2_MODULE, text: `T2 treadmill running in Node 3: ${T2.dba} dBA at the runner's head (NASA measurement).` });
+    }
+    if (inRange(t, SLEEP)) events.push({ id: 'node2', text: 'Crew asleep in their sleep stations (tap Node 2 or Zvezda for their levels).' });
+  }
+  return { levels: out, events };
+}
+
+function chamberLevels(mode, t) {
+  const levels = {};
+  lmlstp.floors.forEach((f, i) => {
+    levels[`floor${i}`] = mode === 'avg' ? f.leq24hDba : f.series[(t - startMinute(f.start) + 1440) % 1440];
+  });
+  return { levels, events: [] };
+}
+
+function Segmented({ value, options, onChange, label }) {
+  return (
+    <div className="segmented" role="tablist" aria-label={label}>
+      {options.map(([v, text]) => (
+        <button key={v} role="tab" aria-selected={value === v} className={value === v ? 'on' : ''} onClick={() => onChange(v)}>
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function Station() {
-  const [hours, setHours] = useState(DEFAULT_DAY);
-  const [t2Minutes, setT2Minutes] = useState(60);
-  const [earplugs, setEarplugs] = useState(false);
-  const [sleepAt, setSleepAt] = useState('cq_stbd');
-  const [floor, setFloor] = useState(1);
+  const [place, setPlace] = useState('iss');
+  const [mode, setMode] = useState('avg');
+  const [t, setT] = useState(8 * 60 + 30);
+  const [playing, setPlaying] = useState(false);
+  const [selected, setSelected] = useState(null);
 
-  const plannedMinutes = Object.values(hours).reduce((a, b) => a + b * 60, 0) + t2Minutes;
-  const day = useMemo(() => {
-    const segs = Object.entries(hours)
-      .filter(([, h]) => h > 0)
-      .map(([id, h]) => {
-        const m = iss.modules.find((x) => x.id === id);
-        return { id, name: m.name, dba: m.dba, minutes: h * 60 };
-      });
-    if (t2Minutes > 0) segs.push({ id: 't2', name: t2.name, dba: t2.dba, minutes: t2Minutes, protected: earplugs });
-    return withProtection(segs, EARPLUG_EFFECTIVE_DB);
-  }, [hours, t2Minutes, earplugs]);
-
-  const work = workdayStatus(day);
   useEffect(() => {
-    try {
-      localStorage.setItem('earshot.plannedDay', JSON.stringify({ leqDba: work.leqDba, status: work.status }));
-    } catch {
-      /* storage unavailable */
-    }
-  }, [work.leqDba, work.status]);
-  const sleepModule = sleepModules.find((m) => m.id === sleepAt);
-  const sleep = sleepStatus([{ dba: sleepModule.dba, minutes: 480 }]);
-  const day24 = [...day, { dba: sleepModule.dba, minutes: 480 }];
-  const dose24 = dose(day24);
-  const top = biggestContributors(day)[0];
+    if (!playing || mode !== 'now') return undefined;
+    const id = setInterval(() => setT((x) => (x + 10) % 1440), 120);
+    return () => clearInterval(id);
+  }, [playing, mode]);
 
-  const chamber = lmlstp.floors[floor];
+  const parts = place === 'iss' ? ISS_PARTS : CHAMBER_PARTS;
+  const { levels, events } = useMemo(() => (place === 'iss' ? issLevels(mode, t) : chamberLevels(mode, t)), [place, mode, t]);
+  const sel = parts.find((p) => p.id === selected);
+  const pick = (id) => setSelected(id);
 
   return (
     <section className="station">
-      <h1>Your station, by sound</h1>
-      <p className="lede">
-        NASA's measured noise levels for each ISS module (Allen 2024, ICES-2024-354). Plan a 16-hour workday and a night, and see how it
-        compares with ISS Flight Rule B13-152 and NASA's 24-hour noise dose (NASA-STD-3001 [V2 6115]).
+      <div className="station-controls">
+        <Segmented label="Place" value={place} onChange={(v) => { setPlace(v); setSelected(null); }} options={[['iss', 'ISS'], ['chamber', 'NASA chamber (real data)']]} />
+        <Segmented label="Mode" value={mode} onChange={(v) => { setMode(v); setPlaying(false); }} options={[['avg', 'Average'], ['now', 'At the moment']]} />
+      </div>
+
+      {mode === 'now' && (
+        <div className="timebar">
+          <button className="secondary play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play the day'}>
+            {playing ? '❚❚' : '▶'}
+          </button>
+          <input type="range" min="0" max="1435" step="5" value={t} onChange={(e) => { setT(Number(e.target.value)); setPlaying(false); }} aria-label="Time of day" />
+          <span className="clock">{clock(t)}</span>
+        </div>
+      )}
+
+      <p className="muted provenance">
+        {place === 'iss' && mode === 'avg' && "NASA's measured average for each module (Allen 2024, ICES-2024-354). Grey: no dBA value published (Unity and the Quest airlock are reported only as meeting NASA's NC-50 limit)."}
+        {place === 'iss' && mode === 'now' && 'Simulated day. NASA publishes module averages, not live levels. Fans and pumps run around the clock, so modules change little hour to hour; the big swings come from crew activities. This day adds two treadmill hours and a sleep period to the measured averages.'}
+        {place === 'chamber' && mode === 'avg' && "Real NASA data: each floor's 24-hour average from the 1997 90-day sealed-chamber test with four crew (LMLSTP 3.3, NASA Life Sciences Portal)."}
+        {place === 'chamber' && mode === 'now' && "Real NASA data, minute by minute. Each floor's 24-hour recording was made on a different date; they're lined up here by time of day."}
       </p>
 
-      <div className="module-grid">
-        {iss.modules.map((m) => (
-          <div key={m.id} className={`module ${levelClass(m.dba)}`} title={`${m.name}: ${m.dba} dBA`}>
-            <span className="module-name">{m.name}</span>
-            <span className="module-dba">{m.dba.toFixed(1)} dBA</span>
-            <span className="module-kind">{m.kind}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="planner">
-        <div className="planner-inputs">
-          <h2>Plan a workday</h2>
-          {Object.keys(DEFAULT_DAY).map((id) => {
-            const m = iss.modules.find((x) => x.id === id);
-            return (
-              <label key={id} className="slider">
-                <span>{m.name} <em>{m.dba} dBA</em></span>
-                <input type="range" min="0" max="8" step="0.5" value={hours[id]} onChange={(e) => setHours({ ...hours, [id]: Number(e.target.value) })} />
-                <span className="val">{hours[id]} h</span>
-              </label>
-            );
-          })}
-          <label className="slider">
-            <span>T2 treadmill <em>{t2.dba} dBA</em></span>
-            <input type="range" min="0" max="120" step="15" value={t2Minutes} onChange={(e) => setT2Minutes(Number(e.target.value))} />
-            <span className="val">{t2Minutes} min</span>
-          </label>
-          <label className="inline">
-            <input type="checkbox" checked={earplugs} onChange={(e) => setEarplugs(e.target.checked)} /> Earplugs on the treadmill
-          </label>
-          <label className="select">
-            Sleep in
-            <select value={sleepAt} onChange={(e) => setSleepAt(e.target.value)}>
-              {sleepModules.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.dba} dBA)</option>)}
-            </select>
-          </label>
-          {Math.abs(plannedMinutes - 960) > 30 && (
-            <p className="muted">Planned {Math.round(plannedMinutes / 6) / 10} h; the flight rule assumes a 16-hour day.</p>
+      <div className="station-stage">
+        <Station3D
+          key={place}
+          parts={parts}
+          levels={levels}
+          selected={selected}
+          onSelect={pick}
+          decor={place === 'iss' ? 'iss' : 'none'}
+          camera={place === 'iss' ? [52, 40, 66] : [13, 11, 15]}
+          target={place === 'iss' ? [-5, -3, 0] : [0, 3, 0]}
+          highlight={events[0]?.id === T2_MODULE ? T2_MODULE : undefined}
+        />
+        <aside className="station-panel">
+          {events.map((e) => <p key={e.text} className="event">{e.text}</p>)}
+          {sel ? (
+            <ModuleDetail part={sel} level={levels[sel.id]} place={place} mode={mode} />
+          ) : (
+            <p className="muted">Drag to turn the station, pinch or scroll to zoom, and tap a {place === 'iss' ? 'module' : 'floor'} for details.</p>
           )}
-        </div>
-
-        <div className="planner-results">
-          <div className={`result-card ${STATUS[work.status].cls}`}>
-            <span className="big">{work.leqDba.toFixed(1)} dBA</span>
-            <span>Workday average</span>
-            <p>{STATUS[work.status].text}</p>
+          <div className="legend3d">
+            {NOISE_BINS.map((b) => (
+              <span key={b.label}><i style={{ background: b.color }} />{b.label}</span>
+            ))}
+            {place === 'iss' && <span><i style={{ background: NO_DATA_COLOR }} />No value published</span>}
           </div>
-          <div className={`result-card ${STATUS[sleep.status].cls}`}>
-            <span className="big">{sleep.leqDba.toFixed(1)} dBA</span>
-            <span>Tonight</span>
-            <p>{STATUS[sleep.status].text}</p>
-          </div>
-          <div className={`result-card ${dose24 > LIMITS.doseMax ? 'urgent' : 'ok'}`}>
-            <span className="big">{dose24.toFixed(0)}</span>
-            <span>24-hour noise dose (limit 100)</span>
-            <p>NASA-STD-3001 [V2 6115]</p>
-          </div>
-          {top && work.status !== 'ok' && (
-            <p className="advice">
-              Biggest contributor today: <strong>{top.name}</strong> ({Math.round(top.share * 100)}% of your sound energy).
-              {top.id === 't2' && !earplugs && ' Wear earplugs on the treadmill: NASA’s own example shows that alone takes a 72.8 dBA day to 63.7 dBA.'}
-            </p>
-          )}
-        </div>
+        </aside>
       </div>
 
-      <div className="chamber">
-        <h2>A real day of NASA noise data</h2>
-        <p className="lede">
-          Minute-by-minute sound levels from NASA's 1997 90-day sealed-chamber test with four crew (LMLSTP 3.3, NASA Life Sciences Portal),
-          run through the same NASA dose formula.
-        </p>
-        <div className="tabs">
-          {lmlstp.floors.map((f, i) => (
-            <button key={f.floor} className={i === floor ? 'tab on' : 'tab'} onClick={() => setFloor(i)}>{f.floor}</button>
-          ))}
-        </div>
-        <ChamberChart series={chamber.series} />
-        <p className="muted chart-note">
-          Red dashed line: 72 dBA, the ISS flight-rule level (B13-152). It applies to the average over a 16-hour workday, not to single minutes,
-          so short peaks above it are not violations by themselves.
-        </p>
-        <p>
-          24-hour average <strong>{chamber.leq24hDba} dBA</strong>, loudest minute {chamber.maxDba} dBA, NASA dose{' '}
-          <strong className={chamber.nasaDose24h > 100 ? 'over' : ''}>{chamber.nasaDose24h}</strong>
-          {chamber.nasaDose24h > 100 ? ': over NASA’s limit of 100 for anyone spending the whole day here.' : ': within NASA’s limit of 100.'}
-        </p>
-        <p className="muted">Static readings at a fixed point on each floor ({chamber.start.replace('T', ' ')} onward), not personal dosimeters.</p>
-      </div>
+      {place === 'chamber' && <ChamberChart floor={selected ? Number(selected.replace('floor', '')) : 1} t={mode === 'now' ? t : null} />}
+      {place === 'iss' && (
+        <details className="module-list">
+          <summary>All measured levels, as a list</summary>
+          <ul>
+            {[...iss.modules].sort((a, b) => b.dba - a.dba).map((m) => (
+              <li key={m.id}><i style={{ background: noiseColor(m.dba) }} />{m.name} <strong>{m.dba.toFixed(1)} dBA</strong> <span className="muted">{m.kind}</span></li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   );
 }
 
-function ChamberChart({ series }) {
+function ModuleDetail({ part, level, place, mode }) {
+  const m = byId[part.id];
+  const sleepers = SLEEP_IN[part.id] ?? [];
+  return (
+    <div className="module-detail">
+      <h3>{part.label}</h3>
+      {part.struct ? (
+        <p className="muted">Connecting passage; no separate noise value.</p>
+      ) : Number.isFinite(level) ? (
+        <p className="level" style={{ color: noiseColor(level) }}>
+          {level.toFixed(1)} dBA <span className="muted">{mode === 'avg' ? (place === 'iss' ? 'measured average' : '24-hour average') : place === 'iss' ? 'simulated now' : 'this minute'}</span>
+        </p>
+      ) : (
+        <p className="muted">No dBA value published (reported only as meeting NASA's NC-50 limit, or not measured).</p>
+      )}
+      {m?.date && <p className="muted">NASA survey of {m.date}</p>}
+      {sleepers.length > 0 && (
+        <>
+          <h4>Sleep stations here</h4>
+          <ul>
+            {sleepers.map((id) => (
+              <li key={id}>{byId[id].name}: <strong style={{ color: noiseColor(byId[id].dba) }}>{byId[id].dba} dBA</strong></li>
+            ))}
+          </ul>
+          <p className="muted">NASA's sleep target is 50 dBA; up to 62 dBA still counts as hearing rest (Flight Rule B13-152).</p>
+        </>
+      )}
+      {place === 'chamber' && (
+        <p className="muted">The chart below shows this floor's full day.</p>
+      )}
+    </div>
+  );
+}
+
+function ChamberChart({ floor, t }) {
+  const f = lmlstp.floors[floor];
+  const series = f.series;
   const W = 720, H = 200, pad = 32;
   const lo = 50, hi = 95;
   const x = (i) => pad + (i / (series.length - 1)) * (W - pad - 8);
   const y = (v) => H - pad - ((v - lo) / (hi - lo)) * (H - pad - 8);
   const line = series.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  // Cumulative dose along the day
-  let acc = 0;
-  const doseLine = series
-    .map((v, i) => {
-      acc += 100 / (480 / 2 ** ((v - 75) / 3));
-      return { i, acc };
-    })
-    .map(({ i, acc: a }) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${(H - pad - (Math.min(a, 250) / 250) * (H - pad - 8)).toFixed(1)}`)
-    .join(' ');
-  const ticks = [50, 60, 70, 80, 90];
+  const cursor = t === null ? null : (t - startMinute(f.start) + 1440) % 1440;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="Sound level over 24 hours">
-      {ticks.map((t) => (
-        <g key={t}>
-          <line x1={pad} x2={W - 8} y1={y(t)} y2={y(t)} className="grid" />
-          <text x={pad - 6} y={y(t) + 4} textAnchor="end" className="axis">{t}</text>
-        </g>
-      ))}
-      <line x1={pad} x2={W - 8} y1={y(72)} y2={y(72)} className="limit" />
-      <text x={pad + 4} y={y(72) + 13} textAnchor="start" className="axis limit-label">72</text>
-      <path d={line} className="series" />
-      <path d={doseLine} className="dose" />
-      <text x={pad} y={H - 8} className="axis">0 h</text>
-      <text x={W - 8} y={H - 8} textAnchor="end" className="axis">24 h</text>
-      <text x={W - 10} y={20} textAnchor="end" className="axis dose-label">cumulative NASA dose (scale 0–250)</text>
-    </svg>
+    <div className="chamber">
+      <h3>{f.floor}: the full recorded day</h3>
+      <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="Sound level over 24 hours">
+        {[50, 60, 70, 80, 90].map((v) => (
+          <g key={v}>
+            <line x1={pad} x2={W - 8} y1={y(v)} y2={y(v)} className="grid" />
+            <text x={pad - 6} y={y(v) + 4} textAnchor="end" className="axis">{v}</text>
+          </g>
+        ))}
+        <line x1={pad} x2={W - 8} y1={y(72)} y2={y(72)} className="limit" />
+        <text x={pad + 4} y={y(72) + 13} textAnchor="start" className="axis limit-label">72</text>
+        <path d={line} className="series" />
+        {cursor !== null && <line x1={x(cursor)} x2={x(cursor)} y1={8} y2={H - pad} className="cursor" />}
+        <text x={pad} y={H - 8} className="axis">{clock(startMinute(f.start))}</text>
+        <text x={W - 8} y={H - 8} textAnchor="end" className="axis">+24 h</text>
+      </svg>
+      <p>
+        24-hour average <strong>{f.leq24hDba} dBA</strong>, loudest minute {f.maxDba} dBA. Spending the whole day here would use{' '}
+        <strong className={f.nasaDose24h > 100 ? 'over' : ''}>{Math.round(f.nasaDose24h)}%</strong> of NASA's daily noise allowance
+        {f.nasaDose24h > 100 ? ', over the limit.' : '.'}
+      </p>
+      <p className="muted">
+        Red dashed line: 72 dBA, the ISS flight-rule level (B13-152). It applies to a 16-hour workday average, not single minutes. Static
+        readings at a fixed point on each floor, not personal dosimeters.
+      </p>
+    </div>
   );
 }
-

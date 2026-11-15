@@ -84,7 +84,8 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
         <p className="muted small">Simulated {BASES[plan.base].name.toLowerCase()}: area levels are the "ISS-like" values at {BASES[plan.base].defaultAtm} psia with fans sped up, as in Station noise. Exercise uses the ISS machines' levels.</p>
       )}
 
-      <div className="plan-answer">
+      <div className="plan-answer today-grid">
+        <div className="today-recs">
         <h2>Your recommendations</h2>
         <ul className="recs">
           <li>
@@ -139,7 +140,9 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
           )}
         </ul>
 
-        <h3 className="plan-sub">Your day</h3>
+        </div>
+        <div className="today-day">
+        <h2 className="plan-sub">Your day</h2>
         <ul className="plan-checks">
           {checks.map((c) => (
             <li key={c.text} className={c.ok ? 'ok' : 'todo'}>
@@ -183,6 +186,7 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
           <button className="day-row add" onClick={() => setEditing({ type: 'add' })}>
             <span className="day-name">+ Add to the day</span>
           </button>
+        </div>
         </div>
       </div>
 

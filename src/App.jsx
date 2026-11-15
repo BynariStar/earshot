@@ -63,6 +63,15 @@ export default function App() {
   const [data, setData] = useState(() => dataFor(session));
   const [plan, setPlanState] = useState(loadPlan);
   const [route, go] = useRoute();
+  // "Show the source" and similar actions: open a module's details on the station map. A request counter makes
+  // repeated taps work even when the route is already home.
+  const [focusReq, setFocusReq] = useState(null);
+  const follow = (to) => {
+    if (to && to.startsWith('home/')) {
+      setFocusReq({ id: to.slice(5), n: Date.now() });
+      go('');
+    } else go(to);
+  };
   const [section, sub] = route.split('/');
   const persona = personaFor(session);
 
@@ -157,7 +166,7 @@ export default function App() {
     if (x.event) setSession({ ...s1, events: [...(s1.events ?? []).filter((e) => e.type !== x.event.type), { ...x.event, at: Date.now() }] });
     else {
       setSession(s1);
-      go(x.to);
+      follow(x.to);
     }
   }
   const overlay = pageAlert && <AlertPage alert={pageAlert} onAct={(x) => actOnAlert(pageAlert, x)} onDismiss={() => dismissAlert(pageAlert)} />;
@@ -182,7 +191,7 @@ export default function App() {
           fresh={fresh}
           onDone={markDone}
           onUndo={(k) => changeSession((prev) => ({ ...prev, done: (prev.done ?? []).filter((x) => x !== k) }))}
-          onAct={(x) => (x.event ? addEvent(x.event) : go(x.to))}
+          onAct={(x) => (x.event ? addEvent(x.event) : follow(x.to))}
           onClose={() => setAlertsOpen(false)}
         />
       )}
@@ -264,7 +273,7 @@ export default function App() {
           session={session}
           persona={persona}
           go={go}
-          focus={section === 'home' ? sub : null}
+          focus={focusReq}
           onEvent={(e) => (e.type === 'ringing' ? reportSymptom(e) : addEvent(e))}
           onClearEvents={clearEvents}
           onChange={() => go('welcome')}
@@ -314,7 +323,7 @@ export default function App() {
         {earsTab === 'normal' && <IsThisNormal data={data} onStartTest={() => startTest('baseline')} />}
         {section === 'test' && <TestFlow key={sub} role={sub === 'baseline' ? 'baseline' : 'check'} data={data} onSave={saveTest} onDone={() => go('ears')} onOpenSudden={() => go('ears/sudden')} />}
         {section === 'quick' && <QuickCheck key={sub} kind={sub || 'general'} data={data} persona={persona} events={session.events ?? []} onSave={saveQuick} onSimulatedFullCheck={simulatedFullCheck} go={go} />}
-        {section === 'plan' && <Planner key={sub ?? ''} plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} focus={sub} alerts={alerts} events={session.events ?? []} go={go} />}
+        {section === 'plan' && <Planner key={sub ?? ''} plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} focus={sub} alerts={alerts} events={session.events ?? []} go={follow} />}
       </main>
       {chrome}
     </div>

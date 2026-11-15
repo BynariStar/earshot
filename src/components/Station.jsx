@@ -98,10 +98,15 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
     return Math.floor((d.getHours() * 60 + d.getMinutes()) / 5) * 5; // the home map opens at the current time of day
   });
   const [playing, setPlaying] = useState(false);
-  const [selected, setSelected] = useState(focus);
+  // focus: { id, n } from an alert action ("Show the source"): select that module and open its details.
+  const [selected, setSelected] = useState(focus?.id ?? null);
+  const [panelOpen, setPanelOpen] = useState(!!focus?.id); // otherwise closed; events show as callouts on the map
   useEffect(() => {
-    if (focus) setSelected(focus);
-  }, [focus]);
+    if (focus?.id) {
+      setSelected(focus.id);
+      setPanelOpen(true);
+    }
+  }, [focus?.id, focus?.n]);
   const [basis, setBasis] = useState('iss');
   const [atm, setAtm] = useState('8.2');
   const [fans, setFans] = useState('same-mass'); // realistic default: the same air mass must still move
@@ -119,7 +124,6 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, liveStart, pausedAt]);
-  const [panelOpen, setPanelOpen] = useState(false); // opens on a tap; events show as callouts on the map
   const [hover, setHover] = useState(null);
   const [viewCtl, setViewCtl] = useState(false);
   const [showKey, setShowKey] = useState(false);
@@ -199,7 +203,16 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
     const inc = activeOn(id);
     return inc?.kind === 'fault' ? { signature: inc.signature, rise: inc.rise } : null;
   };
+  // Tapping a module opens its details; tapping the same module again undoes that: back to "Now" if the
+  // panel was showing Now before, or closed if the tap is what opened it.
+  const openedFrom = useRef(null); // 'now' | 'closed'
   const pick = (id) => {
+    if (id === selected && panelOpen) {
+      setSelected(null);
+      if (openedFrom.current === 'closed') setPanelOpen(false);
+      return;
+    }
+    if (!selected) openedFrom.current = panelOpen ? 'now' : 'closed';
     setSelected(id);
     setPanelOpen(true);
   };

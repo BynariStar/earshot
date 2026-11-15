@@ -966,3 +966,17 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 .quick-actions-row { margin-top: 16px; }
 .choice.with-icon .choice-icon { color: var(--accent); margin-bottom: 4px; }
 .choice.own { border-style: solid; }
+@media (max-width: 700px) {
+  .home-app .map-panel { bottom: 88px; left: 8px; right: 8px; width: auto; max-height: 56vh; border-radius: 18px; }
+}
+/* Today: recommendations on the left, the day on the right (wide screens) */
+.planner-page { max-width: 1180px; }
+.today-grid { max-width: none; }
+@media (min-width: 1100px) {
+  .today-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+  .today-day .plan-sub { margin-top: 0; }
+  .today-day { position: sticky; top: 16px; }
+}
+@media (max-width: 1099px) { .planner-page { max-width: 780px; } }
+.today-day .plan-sub { font-size: 1.5rem; }
+.today-recs > h2, .today-day > h2 { margin: 6px 0 12px; font-size: 1.5rem; }

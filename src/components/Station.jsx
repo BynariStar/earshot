@@ -188,7 +188,8 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   const hereLog = sel && live ? liveFrame(place, liveS, 60).log.filter((e) => e.inc.part === sel.id).slice(0, 4) : [];
   // The panel: "Now" in live view (or during a demo fault), a module's details when one is selected.
   const showPanel = !!sel || live || !!faultModule;
-  // Callouts: a small label above each module with something happening now; tapping one opens its details.
+  // Callouts: a "!" above each module with something happening now (red: loud now; amber: getting louder).
+  // The open module's expands to its full text; tapping a "!" opens that module.
   const shortLabel = (id) => shortPart(partLabel(id));
   // Early warning (simulated): one module creeping louder over days. Shown on the home map only.
   const trend = lockedPlace && place === lockedPlace ? trendFor(place) : null;
@@ -287,7 +288,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           you={you}
           offsetRight={panelShift}
           viewRef={view}
-          callouts={panelOpen && sel ? [] : callouts}
+          callouts={callouts.map((c) => ({ ...c, open: !!(panelOpen && sel && c.id === sel.id) }))}
           onCallout={pick}
         />
 

@@ -1025,3 +1025,19 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
   .station-stage:has(.map-panel) ~ .demo-fab, .station-home:has(.map-panel) .demo-fab { bottom: 96px; }
 }
 .map-time button { white-space: nowrap; }
+
+/* Map alerts: a "!" marker per module (colour = severity); the open module's expands to the full tooltip. */
+.callout-bang { display: none; }
+.callout.compact { min-height: 0; padding: 4px; border-radius: 50%; gap: 0; }
+.callout.compact .callout-text, .callout.compact .callout-more { display: none; }
+.callout.compact .callout-dot { width: 40px; height: 40px; display: grid; place-items: center; animation: none; box-shadow: 0 0 0 0 color-mix(in srgb, var(--urgent) 60%, transparent); animation: event-pulse 1.6s ease-in-out infinite; }
+.callout.compact .callout-bang { display: block; color: #fff; font-weight: 800; font-size: 1.3rem; line-height: 1; }
+.callout.compact.trend .callout-dot { animation: none; }
+.callout.compact.trend .callout-bang { color: #1a1a1a; }
+.callout.compact::after { bottom: -6px; width: 10px; height: 10px; }
+@media (hover: hover) {
+  .callout.compact:hover, .callout.compact:focus-visible { padding: 8px 12px; border-radius: 14px; gap: 8px; }
+  .callout.compact:hover .callout-dot, .callout.compact:focus-visible .callout-dot { width: 10px; height: 10px; }
+  .callout.compact:hover .callout-bang, .callout.compact:focus-visible .callout-bang { display: none; }
+  .callout.compact:hover .callout-text, .callout.compact:hover .callout-more, .callout.compact:focus-visible .callout-text, .callout.compact:focus-visible .callout-more { display: inline; }
+}

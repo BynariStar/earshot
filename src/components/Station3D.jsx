@@ -340,14 +340,19 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     cam.updateProjectionMatrix();
   }, [offsetRight]);
 
-  // Rebuild the callout elements only when which modules have one changes; update their text in place,
+  // Rebuild the callout elements only when which modules have one changes; update their text (and whether
+  // they're collapsed to a "!" marker) in place,
   // so a live number ticking never replaces the button under the user's finger.
   const calloutKey = callouts.map((c) => `${c.id}:${c.kind ?? ''}`).join(';');
   useEffect(() => {
     for (const c of calloutsRef.current) {
-      const t = callouts.find((x) => x.id === c.id)?.text;
+      const cur = callouts.find((x) => x.id === c.id);
+      const t = cur?.text;
       const span = c.el.querySelector('.callout-text');
       if (t && span.textContent !== t) span.textContent = t;
+      // Collapsed to a "!" marker unless its module is the one open; the full text stays the button's name.
+      c.el.classList.toggle('compact', !cur?.open);
+      if (t) c.el.setAttribute('aria-label', t);
     }
   });
   useEffect(() => {
@@ -356,8 +361,9 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     layer.innerHTML = '';
     calloutsRef.current = callouts.map((c) => {
       const el = document.createElement('button');
-      el.className = `callout${c.kind ? ` ${c.kind}` : ''}`;
-      el.innerHTML = `<span class="callout-dot"></span><span class="callout-text"></span><span class="callout-more">›</span>`;
+      el.className = `callout${c.kind ? ` ${c.kind}` : ''}${c.open ? '' : ' compact'}`;
+      el.setAttribute('aria-label', c.text);
+      el.innerHTML = `<span class="callout-dot"><span class="callout-bang">!</span></span><span class="callout-text"></span><span class="callout-more">›</span>`;
       el.querySelector('.callout-text').textContent = c.text;
       el.addEventListener('click', (e) => {
         e.stopPropagation();

@@ -17,7 +17,7 @@ import AlertPage from './components/AlertPage.jsx';
 import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan, applyFlags, normalize, DEFAULT_FILL, DEFAULT_SLEEP } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
-import { personaById, simulatedThresholds } from './lib/personas.js';
+import { personaById, customPersona, simulatedThresholds } from './lib/personas.js';
 import { hearingState, TARGETS } from './lib/personal.js';
 import { buildAlerts } from './lib/alerts.js';
 import { liveHit, incidentPitches, incidentDelta, partLabel, spectrumIdOf } from './lib/live.js';
@@ -47,20 +47,21 @@ function useRoute() {
 const TITLES = { ears: 'My ears', station: 'Explore the data', plan: 'Plan my day', test: 'Hearing test', quick: 'Quick check', about: 'How Earshot works' };
 const APP_START = Date.now();
 
-function dataFor(personaId) {
-  if (personaId === 'own') return load();
-  const p = personaById(personaId);
-  const d = loadSim(personaId) ?? { ...p.state(), quick: [] };
+const personaFor = (s) => (!s || s.persona === 'own' ? null : s.persona === 'custom' ? customPersona(s.custom) : personaById(s.persona));
+function dataFor(s) {
+  if (!s || s.persona === 'own') return load();
+  const p = personaFor(s);
+  const d = loadSim(s.persona) ?? { ...p.state(), quick: [] };
   return { ...d, profile: { ...(d.profile ?? {}), age: p.age, sex: p.sex } };
 }
 
 export default function App() {
   const [session, setSessionState] = useState(loadSession);
-  const [data, setData] = useState(() => (session ? dataFor(session.persona) : load()));
+  const [data, setData] = useState(() => dataFor(session));
   const [plan, setPlanState] = useState(loadPlan);
   const [route, go] = useRoute();
   const [section, sub] = route.split('/');
-  const persona = session && session.persona !== 'own' ? personaById(session.persona) : null;
+  const persona = personaFor(session);
 
   const setSession = (s) => {
     setSessionState(s);
@@ -149,7 +150,8 @@ export default function App() {
 
   function start(s) {
     setSession({ ...s, seen: [], liveStart: Date.now() });
-    setData(dataFor(s.persona));
+    if (s.persona === 'custom') clearSim('custom');
+    setData(dataFor(s));
     go('');
   }
   function addEvent(e) {
@@ -159,7 +161,7 @@ export default function App() {
     setSession({ ...session, events: [], seen: [], liveStart: Date.now() });
     if (persona) {
       clearSim(session.persona);
-      setData(dataFor(session.persona));
+      setData(dataFor(session));
     } else update((d) => ({ ...d, quick: [] }));
   }
   const saveTest = (test, profilePatch) => update((d) => ({ ...d, tests: [...d.tests, test], profile: { ...(d.profile ?? {}), ...(profilePatch ?? {}) } }));
@@ -246,7 +248,7 @@ export default function App() {
             <Station demoEvents={session.events ?? []} liveStart={liveStart} youStation={session.station} />
           </Suspense>
         )}
-        {section === 'about' && <About data={data} onReset={() => setData(dataFor(session.persona))} />}
+        {section === 'about' && <About data={data} onReset={() => setData(dataFor(session))} />}
         {section === 'plan' && <Planner plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} />}
       </main>
       <Footer />

@@ -3,7 +3,7 @@
 // Start screen: where you are, and who you are (your own baseline, or a simulated crew member).
 import { useState } from 'react';
 import { STATIONS } from '../lib/session.js';
-import { PERSONAS } from '../lib/personas.js';
+import { PERSONAS, CONDITIONS, ageOffsetDb } from '../lib/personas.js';
 
 const STATION_NOTES = {
   iss: "NASA's measured module levels and spectra (2022–2024).",
@@ -14,6 +14,8 @@ const STATION_NOTES = {
 export default function Welcome({ onStart, initial }) {
   const [station, setStation] = useState(initial?.station ?? 'iss');
   const [persona, setPersona] = useState(initial?.persona ?? 'high');
+  const [custom, setCustom] = useState(initial?.custom ?? { age: 45, sex: 'female', condition: 'high', ear: 'left' });
+  const setC = (patch) => setCustom((c) => ({ ...c, ...patch }));
   return (
     <div className="welcome">
       <header className="hub-head">
@@ -52,10 +54,42 @@ export default function Welcome({ onStart, initial }) {
             <span className="muted small">{p.story}</span>
           </button>
         ))}
+        <button className={`choice own${persona === 'custom' ? ' on' : ''}`} onClick={() => setPersona('custom')}>
+          <strong>Build your own</strong>
+          <span className="muted small">Choose age, sex and what's happening to their ears.</span>
+        </button>
       </div>
+      {persona === 'custom' && (
+        <div className="custom-form">
+          <label>Age <input type="number" min="25" max="65" value={custom.age} onChange={(e) => setC({ age: Math.max(25, Math.min(65, Number(e.target.value) || 25)) })} /></label>
+          <label>Sex
+            <select value={custom.sex} onChange={(e) => setC({ sex: e.target.value })}>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
+          </label>
+          <label>Ears
+            <select value={custom.condition} onChange={(e) => setC({ condition: e.target.value })}>
+              {CONDITIONS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </label>
+          {custom.condition !== 'steady' && (
+            <label>Which ear
+              <select value={custom.ear} onChange={(e) => setC({ ear: e.target.value })}>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+            </label>
+          )}
+          <p className="muted small">
+            Age sets the starting hearing at high pitches from NASA's astronaut hearing-by-age table (LSAH):{' '}
+            {Math.round(ageOffsetDb(custom.age, custom.sex))} dB above a {custom.sex} astronaut under 35 at 4 kHz. Approximate: NASA's table covers 6 kHz only.
+          </p>
+        </div>
+      )}
 
       <div className="welcome-go">
-        <button className="primary" onClick={() => onStart({ station, persona, events: [] })}>Start</button>
+        <button className="primary" onClick={() => onStart({ station, persona, events: [], ...(persona === 'custom' ? { custom } : {}) })}>Start</button>
         
       </div>
     </div>

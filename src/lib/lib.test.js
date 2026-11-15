@@ -340,3 +340,16 @@ describe('live feed (simulated)', () => {
     expect(ex.actions.map((x) => x.to)).toEqual(['quick/live', 'home/node2']);
   });
 });
+
+import { customPersona, ageOffsetDb } from './personas.js';
+describe('build your own simulated crew member', () => {
+  it('ages the starting hearing from NASA LSAH and builds the chosen condition', () => {
+    expect(ageOffsetDb(30, 'male')).toBe(0);
+    expect(ageOffsetDb(57, 'male')).toBeCloseTo(38.43 - 12.56, 2);
+    expect(ageOffsetDb(52, 'female')).toBeCloseTo(15.0 - 8.39, 2); // comparison group where the astronaut table is empty
+    const deaf = customPersona({ age: 40, sex: 'female', condition: 'deaf', ear: 'right' }).state();
+    expect(deaf.tests[0].thresholds.right[1000]).toBeGreaterThanOrEqual(85);
+    const low = customPersona({ age: 40, sex: 'male', condition: 'low', ear: 'right' }).state();
+    expect(low.tests[low.tests.length - 1].confirmedFindings.map((f) => `${f.kind}:${f.ear}`)).toContain('low:right');
+  });
+});

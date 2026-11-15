@@ -6,6 +6,8 @@
 // about 9% (HSRB hearing-loss risk record, Rev B.1, 2025).
 import { evaluate, averageBaselines } from './rules.js';
 import { demoState } from './demo.js';
+import lsah from '../data/lsah.json';
+import { NO_RESPONSE_LEVEL } from './threshold.js';
 
 const BASE = {
   left: { 250: 30, 500: 25, 1000: 20, 2000: 20, 3000: 25, 4000: 30 },
@@ -16,12 +18,12 @@ const add = (t, d = {}) => ({
   right: Object.fromEntries(Object.entries(t.right).map(([f, v]) => [f, v + (d.right?.[f] ?? 0)])),
 });
 
-function build(checks, extra = {}) {
+function build(checks, extra = {}, base = BASE) {
   const launch = new Date();
   const day = (d) => new Date(launch.getTime() + d * 86400000).toISOString();
   const tests = checks.map(([d, role, delta], i) => ({
     id: `sim-${i}`, date: day(d), missionDay: d, role, headphones: 'Crew headphones', noise: { checked: true, pass: true }, context: [], complete: true,
-    thresholds: add(BASE, delta), simulated: true,
+    thresholds: add(base, delta), simulated: true,
   }));
   const ref = averageBaselines(tests[0].thresholds, tests[1].thresholds);
   for (const t of tests.filter((x) => x.role === 'check')) t.confirmedFindings = evaluate(ref, t.thresholds).findings;
@@ -61,8 +63,62 @@ export const personaById = (id) => PERSONAS.find((p) => p.id === id) ?? null;
 
 // The simulated crew member's thresholds right now, given today's events (for a simulated quick check).
 export function simulatedThresholds(persona, events = []) {
-  let t = add(BASE, persona.truth);
+  let t = add(persona.baseThresholds ?? BASE, persona.truth);
   if (events.some((e) => e.type === 'loud' || e.type === 'fan-fault' || e.type === 'live') && persona.afterNoise) t = add(t, persona.afterNoise);
   if (events.some((e) => e.type === 'ringing') && persona.afterRinging) t = add(t, persona.afterRinging);
   return t;
+}
+
+// --- Build your own simulated crew member -----------------------------------------------------------
+// Age and sex set the starting hearing at high pitches from NASA's astronaut hearing-by-age table (LSAH,
+// 1998). That table gives 6 kHz only, so we apply its age-group difference fully at 4 kHz and partly at
+// 3 and 2 kHz, the way age-related loss slopes. An approximation, labelled as one. Where the astronaut
+// group has no value (women over 49), the table's comparison group is used.
+
+const AGE_BANDS = [[0, 35, '< 35'], [35, 40, '35-39'], [40, 45, '40-44'], [45, 50, '45-49'], [50, 55, '50-54'], [55, 60, '55-59'], [60, 200, '60+']];
+export function ageOffsetDb(age, sex) {
+  const g = sex === 'female' ? 'Female' : 'Male';
+  const band = AGE_BANDS.find(([a, b]) => age >= a && age < b)?.[2] ?? '< 35';
+  const v = (k) => lsah.table.groups[`${g} Astronauts`][k] ?? lsah.table.groups[`${g} Comparisons`][k];
+  return Math.max(0, v(band) - v('< 35'));
+}
+
+export const CONDITIONS = [
+  { id: 'steady', label: 'Steady ears' },
+  { id: 'high', label: 'Early high-pitch change' },
+  { id: 'low', label: 'Low-pitch shift' },
+  { id: 'sudden', label: 'Sudden drop ahead' },
+  { id: 'deaf', label: "One ear doesn't hear" },
+];
+
+const onEar = (ear, d) => ({ [ear]: d });
+export function customPersona({ age = 40, sex = 'female', condition = 'high', ear = 'left' } = {}) {
+  const off = ageOffsetDb(age, sex);
+  const aged = { 2000: Math.round(off * 0.3), 3000: Math.round(off * 0.6), 4000: Math.round(off) };
+  const base = { left: { ...BASE.left }, right: { ...BASE.right } };
+  for (const e of ['left', 'right']) for (const [f, d] of Object.entries(aged)) base[e][f] += d;
+  if (condition === 'deaf') for (const f of Object.keys(base[ear])) base[ear][f] = NO_RESPONSE_LEVEL;
+  const other = ear === 'left' ? 'right' : 'left';
+  const checks = {
+    steady: [[30, 'check', {}], [60, 'check', {}]],
+    high: [[30, 'check', onEar(ear, { 4000: 5 })], [60, 'check', onEar(ear, { 3000: 5, 4000: 7 })]],
+    low: [[30, 'check', onEar(ear, { 250: 5 })], [60, 'check', onEar(ear, { 250: 15, 500: 10 })]],
+    sudden: [[45, 'check', {}]],
+    deaf: [[30, 'check', {}], [60, 'check', onEar(other, { 4000: 5 })]],
+  }[condition];
+  const label = CONDITIONS.find((c) => c.id === condition)?.label ?? condition;
+  return {
+    id: 'custom',
+    name: 'Your crew member',
+    tag: label,
+    age,
+    sex,
+    custom: true,
+    story: `${age}, ${sex}. ${label}${condition === 'steady' ? '' : `, ${ear} ear`}.`,
+    state: () => build([[-30, 'baseline', {}], [-29, 'baseline', {}], ...checks], {}, base),
+    truth: checks[checks.length - 1][2],
+    afterNoise: condition === 'deaf' ? onEar(other, { 2000: 6, 3000: 10, 4000: 13 }) : onEar(ear, { 2000: 6, 3000: 10, 4000: 13 }),
+    afterRinging: condition === 'sudden' ? onEar(ear, { 1000: 15, 2000: 35, 3000: 40, 4000: 35 }) : null,
+    baseThresholds: base,
+  };
 }

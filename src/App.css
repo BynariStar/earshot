@@ -533,3 +533,8 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 .station-choice img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; margin-bottom: 10px; }
 .station-choice strong, .station-choice span { padding: 0 14px; }
 .warn-text { color: var(--watch); font-size: 0.85rem; }
+.custom-form { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 12px 0 0; }
+.custom-form label { display: flex; align-items: center; gap: 8px; }
+.custom-form input, .custom-form select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.custom-form input { width: 70px; }
+.custom-form p { flex-basis: 100%; margin: 0; }

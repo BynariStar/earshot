@@ -85,6 +85,9 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated }) {
     sub = 'Every pitch within 5 dB of your baseline.';
   }
   if (!cta && !simulated && check) cta = { label: 'Check my hearing', role: 'check' };
+  // An ear with no response at any pitch at baseline can't be tracked; say so once.
+  const deafEar = reference && ['left', 'right'].find((e) => FREQUENCIES.every((f) => statusByEar[e]?.[f] === 'unmeasurable'));
+  if (deafEar) sub = `${sub} Your ${deafEar} ear gave no response at baseline, so Earshot tracks your ${deafEar === 'left' ? 'right' : 'left'} ear.`;
 
   return (
     <section className="home">

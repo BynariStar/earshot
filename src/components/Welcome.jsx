@@ -1,6 +1,7 @@
 // AI-generated: written by Claude (Anthropic AI assistant) for team Earshot, NASA Space Apps 2026.
 // Reviewed and directed by the team. See AI_USE.md.
 // Start screen: where you are, and who you are (your own baseline, or a simulated crew member).
+import { startGuidedDemo } from '../lib/guided.js';
 import { useState } from 'react';
 import { STATIONS } from '../lib/session.js';
 import { PERSONAS, CONDITIONS, ageOffsetDb } from '../lib/personas.js';
@@ -94,6 +95,7 @@ export default function Welcome({ onStart, initial, onAbout, onExplore }) {
         
       </div>
       <p className="muted small welcome-foot">
+        <button className="secondary" onClick={startGuidedDemo}>▶ Watch a 1-minute demo</button>
         <button className="secondary" onClick={onExplore}>Explore the data</button>
         <button className="secondary" onClick={onAbout}>Sources and disclosures</button>
       </p>

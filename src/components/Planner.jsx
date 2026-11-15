@@ -41,7 +41,7 @@ function DayBar({ result }) {
 
 const shortName = (n) => shortPart(n);
 
-export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focus, alerts = [], events = [], go }) {
+export default function Planner({ nowMin: nowMinProp = null, plan: rawPlan, setPlan, data, lockedBase, focus, alerts = [], events = [], go }) {
   const [editing, setEditing] = useState(focus === 'sleep' ? { type: 'sleep' } : null);
   const plan = normalize(rawPlan);
   const target = TARGETS[hearingState(data).state];
@@ -80,7 +80,7 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
   const exposure = alerts.find((a) => a.id === 'exposure');
   const sleepOk = r.sleepModule.dba <= 50;
   const items = timeline(r);
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const nowMin = nowMinProp ?? new Date().getHours() * 60 + new Date().getMinutes();
   const next = nextFlagged(items, nowMin);
   const times = Object.fromEntries(items.map((s) => [s.id, `${clockOf(s.start)}–${clockOf(s.end)}`]));
   const loudToday = events.some((e) => e.type === 'loud' || e.type === 'live');

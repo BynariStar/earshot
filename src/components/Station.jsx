@@ -282,7 +282,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           selected={selected}
           onSelect={pick}
           decor={base ? base.decor : place === 'iss' ? 'iss' : 'none'}
-          camera={base ? base.camera : place === 'iss' ? [64, 49, 81] : [13, 11, 15]}
+          camera={base ? base.camera : place === 'iss' ? [35, 53, 108] : [13, 11, 15]}
           target={base ? base.target : place === 'iss' ? [-5, -3, 0] : [0, 3, 0]}
           highlight={live ? highlights : faultModule ?? (base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined)}
           you={you}

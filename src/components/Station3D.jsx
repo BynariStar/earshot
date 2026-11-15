@@ -106,6 +106,9 @@ function makeYouMarker() {
   return sprite;
 }
 
+// The swing-in plays once per app load, not every time the map is shown again.
+let introPlayed = false;
+
 export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null, offsetRight = 0, viewRef, callouts = [], onCallout }) {
   const mountRef = useRef(null);
   const markerRef = useRef(null);
@@ -261,9 +264,21 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     const placeCallouts = () => {
       const w = renderer.domElement.clientWidth;
       const h = renderer.domElement.clientHeight;
-      // Anchor each callout above its module, then push overlapping ones upward so none hides another.
+      // Anchor each callout above its module, then push overlapping ones upward so none hides another. The open
+      // (expanded) callout is placed first so the "!" markers move out of its way, and the "You" label counts
+      // as taken space.
       const placed = [];
-      for (const c of calloutsRef.current) {
+      const mk = markerRef.current;
+      if (mk?.visible) {
+        v.copy(mk.position).project(cam);
+        if (v.z <= 1) {
+          const mw = mk.scale.x * h * 1.15;
+          const mh = mk.scale.y * h * 1.15;
+          placed.push({ x: ((v.x + 1) / 2) * w - mw / 2, y: ((1 - v.y) / 2) * h - mh, w: mw, h: mh });
+        }
+      }
+      const order = [...calloutsRef.current].sort((a, b) => (b.open ? 1 : 0) - (a.open ? 1 : 0));
+      for (const c of order) {
         const mesh = meshes[c.id];
         if (!mesh) continue;
         box.setFromObject(mesh);
@@ -277,10 +292,11 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
         const ch = c.el.offsetHeight;
         const x = ((v.x + 1) / 2) * w - cw / 2;
         let y = ((1 - v.y) / 2) * h - ch - c.lift;
-        for (let guard = 0; guard < 6; guard++) {
-          const hit = placed.find((p) => x < p.x + p.w + 6 && p.x < x + cw + 6 && y < p.y + p.h + 6 && p.y < y + ch + 6);
+        const gap = 14; // room for the pointer under each callout
+        for (let guard = 0; guard < 8; guard++) {
+          const hit = placed.find((p) => x < p.x + p.w + 6 && p.x < x + cw + 6 && y < p.y + p.h + gap && p.y < y + ch + gap);
           if (!hit) break;
-          y = hit.y - ch - 8;
+          y = hit.y - ch - gap;
         }
         placed.push({ x, y, w: cw, h: ch });
         c.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
@@ -288,7 +304,28 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     };
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     let raf;
+    // Intro: once per app load, the station swings in to its resting view (about 1.6 s), then stays still.
+    // A drag cancels it. Skipped when the system asks for reduced motion.
+    let intro = null;
+    if (!introPlayed && !still) {
+      const end = new THREE.Spherical().setFromVector3(cam.position.clone().sub(controls.target));
+      intro = { t0: null, end, from: { theta: end.theta + 0.75, phi: end.phi - 0.12, radius: end.radius * 1.25 } };
+      renderer.domElement.addEventListener('pointerdown', () => { intro = null; introPlayed = true; }, { once: true });
+    }
+    const ease = (t) => 1 - (1 - t) ** 3;
     const loop = (now = 0) => {
+      if (intro) {
+        const tNow = performance.now();
+        if (intro.t0 === null) intro.t0 = tNow;
+        const k = ease(Math.min(1, (tNow - intro.t0) / 1600));
+        const sph = new THREE.Spherical(
+          intro.from.radius + (intro.end.radius - intro.from.radius) * k,
+          intro.from.phi + (intro.end.phi - intro.from.phi) * k,
+          intro.from.theta + (intro.end.theta - intro.from.theta) * k
+        );
+        cam.position.setFromSpherical(sph).add(controls.target);
+        if (k >= 1) { intro = null; introPlayed = true; } // marked played only once it has run in full
+      }
       for (const hi of highlightRef.current) {
         const m = meshes[hi];
         if (m && hi !== selectedRef.current) m.material.emissiveIntensity = still ? 0.6 : 0.15 + 0.6 * (0.5 + 0.5 * Math.sin(now / 260));
@@ -352,6 +389,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       if (t && span.textContent !== t) span.textContent = t;
       // Collapsed to a "!" marker unless its module is the one open; the full text stays the button's name.
       c.el.classList.toggle('compact', !cur?.open);
+      c.open = !!cur?.open;
       if (t) c.el.setAttribute('aria-label', t);
     }
   });
@@ -371,7 +409,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       });
       el.addEventListener('pointerdown', (e) => e.stopPropagation());
       layer.appendChild(el);
-      return { id: c.id, el, lift: c.id === you ? 58 : 12 };
+      return { id: c.id, el, lift: c.id === you ? 58 : 12, open: !!c.open };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calloutKey, parts, you]);

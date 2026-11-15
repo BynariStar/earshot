@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { STATIONS } from '../lib/session.js';
 import { partsOf } from '../lib/live.js';
 import Sheet from './Sheet.jsx';
+import { startGuidedDemo } from '../lib/guided.js';
 
 const Station = lazy(() => import('./Station.jsx'));
 
@@ -42,6 +43,10 @@ export default function StationHome({ session, persona, data, focus, onEvent, on
         <Sheet title="Demo controls" onClose={close}>
           <p className="muted demo-who">{persona ? `${persona.name} (simulated)` : 'You (your own baseline)'} · {st.name}</p>
           <div className="rows">
+            <button className="row" onClick={startGuidedDemo}>
+              <span>Play the guided demo<span className="muted small"> 1 min · Space pauses, → skips, Esc exits</span></span>
+              <span aria-hidden="true">▶</span>
+            </button>
             <button className="row" onClick={() => setSheet('move')}>
               <span>Move me to…<span className="muted small"> {session.youAt ? parts.find((p) => p.id === session.youAt)?.label : 'following my schedule'}</span></span>
               <span aria-hidden="true">›</span>

@@ -108,7 +108,20 @@ export default function App() {
   }, [plan, session]);
 
   // The clock, in minutes since midnight, refreshed every 30 s (for "earplugs ahead").
-  const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  const [realNowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  // The guided demo steers the simulation only: the live feed's clock and the time of day.
+  const [clockOverride, setClockOverride] = useState(null);
+  const nowMin = clockOverride ?? realNowMin;
+  useEffect(() => {
+    const on = (e) => {
+      const d = e.detail ?? {};
+      if (d.type === 'live-at') changeSession((prev) => (prev ? { ...prev, liveStart: Date.now() - d.s * 1000, pausedAt: null } : prev));
+      if (d.type === 'pause') changeSession((prev) => (prev && !prev.pausedAt ? { ...prev, pausedAt: Date.now() } : prev));
+      if (d.type === 'clock') setClockOverride(d.min);
+    };
+    window.addEventListener('earshot-demo', on);
+    return () => window.removeEventListener('earshot-demo', on);
+  }, []);
   useEffect(() => {
     const id = setInterval(() => { const d = new Date(); setNowMin(d.getHours() * 60 + d.getMinutes()); }, 30000);
     return () => clearInterval(id);
@@ -297,14 +310,24 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="appbar">
-        <button className="back" onClick={back} aria-label="Back">
-          <span aria-hidden="true">‹</span>
-        </button>
-        <h1>{TITLES[section]}</h1>
-        {section === 'ears' && persona && <span className="muted appbar-sub">{persona.name} (simulated)</span>}
-        {section === 'ears' && <TestsMenu data={data} onDelete={deleteTest} />}
-      </header>
+      {/* Rail pages (Today, My ears, Alerts) need no header: the rail shows where you are. Screens without the
+          rail (the hearing test, the quick check) keep the back button as their way out. */}
+      {showTabs ? (
+        <h1 className="sr-only">{TITLES[section]}</h1>
+      ) : (
+        <header className="appbar">
+          <button className="back" onClick={back} aria-label="Back">
+            <span aria-hidden="true">‹</span>
+          </button>
+          <h1>{TITLES[section]}</h1>
+        </header>
+      )}
+      {section === 'ears' && (
+        <div className="page-tools">
+          {persona && <span className="muted">{persona.name} (simulated)</span>}
+          <TestsMenu data={data} onDelete={deleteTest} />
+        </div>
+      )}
 
       {section === 'ears' && earsTabs.length > 0 && (
         <div className="segmented tabs-ears" role="tablist" aria-label="My ears">
@@ -334,7 +357,7 @@ export default function App() {
             onAct={(x) => (x.event ? addEvent(x.event) : follow(x.to))}
           />
         )}
-        {section === 'plan' && <Planner key={sub ?? ''} plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} focus={sub} alerts={alerts} events={session.events ?? []} go={follow} />}
+        {section === 'plan' && <Planner key={sub ?? ''} nowMin={nowMin} plan={effectivePlan} setPlan={setPlan} data={data} lockedBase={session.station} focus={sub} alerts={alerts} events={session.events ?? []} go={follow} />}
       </main>
       {chrome}
     </div>

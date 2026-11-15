@@ -142,8 +142,8 @@ export default function SuddenResponse({ data, onRetest }) {
           <li><strong>Follow-up:</strong> a hearing test at the end of treatment and again within 6 months.</li>
         </ul>
         <p className="muted small">
-          On the ISS: the 2023 medication list (as reproduced by WikEM) includes oral prednisone and methylprednisolone and injectable
-          dexamethasone. Crew medical officers are usually not physicians, so dosing and the decision stay with the flight surgeon.
+          On the ISS: the 2023 formulary (Diaz et al., npj Microgravity 2024, as listed by WikEM) includes oral prednisone and methylprednisolone
+          and injectable dexamethasone. Crew medical officers are usually not physicians, so dosing and the decision stay with the flight surgeon.
         </p>
       </article>
 

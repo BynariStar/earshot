@@ -11,7 +11,19 @@ const STRUCT_COLOR = '#4a5068';
 
 function makeMesh(p) {
   let geo;
-  if (p.sphere) geo = new THREE.SphereGeometry(p.r, 24, 16);
+  if (p.box) geo = new THREE.BoxGeometry(...p.box);
+  else if (p.theta) {
+    // A solid wedge of a vertical cylinder: an arc-shaped outline extruded upward, centred on pos.
+    const [a0, len] = p.theta;
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.lineTo(p.r * Math.cos(a0), p.r * Math.sin(a0));
+    shape.absarc(0, 0, p.r, a0, a0 + len, false);
+    shape.lineTo(0, 0);
+    geo = new THREE.ExtrudeGeometry(shape, { depth: p.len, bevelEnabled: false, curveSegments: 24 });
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(0, -p.len / 2, 0);
+  } else if (p.sphere) geo = new THREE.SphereGeometry(p.r, 24, 16);
   else {
     geo = new THREE.CylinderGeometry(p.rTop ?? p.r, p.r, p.len, 28, 1);
     if (p.axis === 'x') geo.rotateZ(Math.PI / 2);
@@ -40,6 +52,13 @@ function addIssDecor(scene) {
     panel.position.set(7, 3.8, z);
     scene.add(panel);
   }
+}
+
+function addGround(scene, color) {
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 48), new THREE.MeshStandardMaterial({ color, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.01;
+  scene.add(ground);
 }
 
 export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight }) {
@@ -79,6 +98,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     }
     meshesRef.current = meshes;
     if (decor === 'iss') addIssDecor(scene);
+    if (decor === 'moon') addGround(scene, '#3d4049');
+    if (decor === 'mars') addGround(scene, '#6b3420');
 
     const controls = new OrbitControls(cam, renderer.domElement);
     controls.target.set(...target);

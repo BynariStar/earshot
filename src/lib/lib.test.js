@@ -216,3 +216,29 @@ describe('sudden-drop decision support', () => {
     expect(windowStatus(60).phase).toBe('late');
   });
 });
+
+import { pressureDelta, SPEC_WORK_DBA, SPEC_SLEEP_DBA, BASES, baseLevel } from './bases.js';
+describe('simulated bases', () => {
+  it('converts NASA NC curves to dBA', () => {
+    console.log('NC-50 dBA', SPEC_WORK_DBA.toFixed(2), 'NC-40 dBA', SPEC_SLEEP_DBA.toFixed(2));
+    expect(SPEC_WORK_DBA).toBeGreaterThan(56);
+    expect(SPEC_WORK_DBA).toBeLessThan(61);
+    expect(SPEC_SLEEP_DBA).toBeLessThan(SPEC_WORK_DBA - 8);
+  });
+  it('estimates the exploration-atmosphere effect on fan noise', () => {
+    const a = pressureDelta('8.2');
+    const b = pressureDelta('10.2');
+    console.log('8.2 psia', a.rho.toFixed(3), a.sameSpeed.toFixed(2), a.sameMass.toFixed(2), '| 10.2 psia', b.rho.toFixed(3), b.sameSpeed.toFixed(2), b.sameMass.toFixed(2));
+    expect(a.sameSpeed).toBeCloseTo(-7.4, 0);
+    expect(a.sameMass).toBeCloseTo(4.9, 0);
+    expect(b.sameSpeed).toBeCloseTo(-4.7, 0);
+    expect(pressureDelta('14.7').applied).toBeCloseTo(0, 6);
+  });
+  it('uses NC-50 for Moon sleep (30-day missions) and NC-40 for Mars', () => {
+    const opts = { basis: 'spec', atm: '8.2', fans: 'same-speed', mode: 'avg', t: 0 };
+    const moonSleep = baseLevel(BASES.moon, BASES.moon.parts.find((p) => p.kind === 'sleep'), opts).dba;
+    const marsSleep = baseLevel(BASES.mars, BASES.mars.parts.find((p) => p.kind === 'sleep'), opts).dba;
+    expect(moonSleep).toBeCloseTo(SPEC_WORK_DBA, 6);
+    expect(marsSleep).toBeCloseTo(SPEC_SLEEP_DBA, 6);
+  });
+});

@@ -17,7 +17,7 @@ import AlertPage from './components/AlertPage.jsx';
 import TestsMenu from './components/TestsMenu.jsx';
 import TabBar from './components/TabBar.jsx';
 import Alerts from './components/Alerts.jsx';
-import { load, save, withoutTest, latestCheck, baselineTests } from './lib/storage.js';
+import { load, save, withoutTest, baselineTests } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan, applyFlags, normalize, scheduleFor, timeline } from './lib/plan.js';
 import { loadSession, saveSession, loadSim, saveSim, clearSim } from './lib/session.js';
 import { personaById, customPersona, simulatedThresholds } from './lib/personas.js';
@@ -206,7 +206,8 @@ export default function App() {
     markSeen(keys);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, unseenKeys]);
-  const showTabs = session && section !== 'test' && section !== 'quick' && section !== 'about';
+  // The sudden-drop response is a focused procedure, like the hearing test: no rail, its own way back.
+  const showTabs = session && section !== 'test' && section !== 'quick' && section !== 'about' && route !== 'ears/sudden';
   const chrome = (
     <>
       {showTabs && <TabBar section={section} go={go} badge={section === 'alerts' ? 0 : unseen.length} badgeLevel={badgeLevel} />}
@@ -303,10 +304,8 @@ export default function App() {
     );
   }
 
-  const back = section === 'test' ? () => go('ears') : () => go('');
+  const back = section === 'test' || route === 'ears/sudden' ? () => go('ears') : () => go('');
   const earsTab = section === 'ears' ? sub || 'overview' : null;
-  const hasSudden = latestCheck(data)?.confirmedFindings?.some((f) => f.kind === 'sudden');
-  const earsTabs = hasSudden || earsTab === 'sudden' ? [['overview', 'Overview'], ['sudden', 'Sudden drop: act now']] : [];
 
   return (
     <div className="app">
@@ -319,29 +318,14 @@ export default function App() {
           <button className="back" onClick={back} aria-label="Back">
             <span aria-hidden="true">‹</span>
           </button>
-          <h1>{TITLES[section]}</h1>
+          <h1>{route === 'ears/sudden' ? 'Sudden-drop response' : TITLES[section]}</h1>
         </header>
       )}
-      {section === 'ears' && (
-        <div className="page-tools">
-          {persona && <span className="muted">{persona.name} (simulated)</span>}
-          <TestsMenu data={data} onDelete={deleteTest} />
-        </div>
-      )}
 
-      {section === 'ears' && earsTabs.length > 0 && (
-        <div className="segmented tabs-ears" role="tablist" aria-label="My ears">
-          {earsTabs.map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={earsTab === k} className={earsTab === k ? 'on' : ''} onClick={() => go(k === 'overview' ? 'ears' : `ears/${k}`)}>
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
 
       <main>
         {earsTab === 'overview' && (
-          <Home data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} earplugs={flags.flagged.map((f) => f.name)} go={go} onReport={reportSymptom} onSimulatedFullCheck={simulatedFullCheck} />
+          <Home tools={<div className="page-tools">{persona && <span className="muted">{persona.name} (simulated)</span>}<TestsMenu data={data} onDelete={deleteTest} /></div>} data={data} onStartTest={startTest} onOpenSudden={() => go('ears/sudden')} simulated={!!persona} earplugs={flags.flagged.map((f) => f.name)} go={go} onReport={reportSymptom} onSimulatedFullCheck={simulatedFullCheck} />
         )}
         {earsTab === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={startTest} />}
         {earsTab === 'sudden' && <SuddenResponse data={data} onRetest={() => go('quick/ringing')} />}

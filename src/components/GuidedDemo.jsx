@@ -49,9 +49,11 @@ const SCRIPT = [
     await d.tap('.tab', 'Alerts');
     await d.wait(1200);
     await d.tap('.alert-row button', 'Quick check');
-    await d.wait(1000);
+    await d.wait(800);
+    await d.tap('.scenarios .row', 'No change');
     await d.tap('button.primary', 'Simulate');
-    await d.wait(3500);
+    d.say('No lasting change: every pitch within a few dB of baseline.');
+    await d.wait(3000);
   },
   async (d) => {
     d.say("My ears: each ear against B's own baseline, using NASA's definition of a hearing shift.");

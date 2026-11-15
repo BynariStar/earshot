@@ -28,7 +28,7 @@ const RANK = { urgent: 4, shift: 3, watch: 2 };
 const hz = (f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
-export default function Home({ data, onStartTest, onOpenSudden, simulated, earplugs = [], go, onReport, onSimulatedFullCheck }) {
+export default function Home({ tools = null, data, onStartTest, onOpenSudden, simulated, earplugs = [], go, onReport, onSimulatedFullCheck }) {
   const [reporting, setReporting] = useState(null); // null | 'symptom' | { symptom }
   const [picked, setPicked] = useState(null);
   const [showNormal, setShowNormal] = useState(false);
@@ -95,7 +95,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
     title = e.title;
     sub = firstSentence(e.what);
     more = e.what.slice(sub.length).trim() || null;
-    todo = e.actions.slice(0, 3);
+    todo = e.actions.filter((a) => !a.startsWith('Open the sudden-drop response')).slice(0, 3);
   } else if (worst) {
     const w = statusByEar.raw[worst.ear].perFreq[worst.frequency];
     title = `${cap(worst.ear)} ear, ${hz(worst.frequency)}: ${Math.round(w)} dB worse`;
@@ -121,10 +121,12 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
   const status = statusByEar[selected.ear]?.[selected.frequency] ?? 'untested';
   const delta = statusByEar.raw?.[selected.ear]?.perFreq?.[selected.frequency];
 
+  const isSudden = !quickNewer && findings.some((f) => f.kind === 'sudden');
   return (
-    <section className="home ears-page">
-      <div className="ears-verdict">
-        <h2>{title}</h2>
+    <section className="home ears-page ears-grid">
+      <div className="ears-col-left">
+      <div className={`ears-verdict${isSudden ? ' urgent' : ''}`}>
+        <h2>{isSudden && <span className="verdict-bang" aria-hidden="true">!</span>}{title}</h2>
         <p>
           {sub}
           {more && <Info>{more}</Info>}
@@ -136,7 +138,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
             <ul>{todo.map((a) => <li key={a}>{a}</li>)}</ul>
           </div>
         )}
-        {!quickNewer && findings.some((f) => f.kind === 'sudden') && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
+        {isSudden && <button className="primary urgent-btn" onClick={onOpenSudden}>Start the sudden-drop response</button>}
         {quickCta && (simulated ? <button className="primary" onClick={() => onSimulatedFullCheck(lastQuick.truth)}>Run the full check (simulated)</button> : <button className="primary" onClick={() => onStartTest('check')}>Full check now</button>)}
         {earplugs.length > 0 && (findings.length ? findings.some((f) => f.kind === 'high') : !!worst && worst.frequency >= 2000) && (
           <p>
@@ -163,7 +165,11 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
           {cta && <button className={reference ? 'secondary' : 'primary'} onClick={() => onStartTest(cta.role)}>{cta.role === 'check' ? 'Full check · 8 min' : cta.label}</button>}
         </div>
       </div>
+      <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
+      </div>
 
+      <div className="ears-col-right">
+      {tools}
       <div className="ears two">
         {['left', 'right'].map((ear) => (
           <figure key={ear} className="ear">
@@ -192,6 +198,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
           baseline, using NASA's hearing-shift rules: green steady, yellow 5 to 9 dB worse, orange 10 dB or more, red 30 dB or more, grey no response at baseline.
         </Info>
       </p>
+      </div>
       {reporting === 'symptom' && (
         <Sheet title="Report a symptom" onClose={() => setReporting(null)}>
           <div className="rows">
@@ -212,7 +219,6 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
           </div>
         </Sheet>
       )}
-      <Trend reference={reference} checks={data.tests.filter((t) => t.role !== 'baseline' && t.complete)} />
     </section>
   );
 }

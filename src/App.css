@@ -1053,3 +1053,20 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 .page-tools { display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding-top: 14px; }
 .page-tools .tests-menu { margin-left: 0; }
 .alerts-page { max-width: 760px; margin: 24px auto 0; }
+
+/* Sudden drop: the urgent result on My ears (no tab); the response is its own focused screen. */
+.ears-verdict.urgent h2 { color: var(--urgent); display: flex; align-items: center; gap: 12px; }
+.verdict-bang { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--urgent); color: #fff; font-size: 1.2rem; font-weight: 800; }
+.urgent-btn { background: var(--urgent); border-color: var(--urgent); color: #fff; }
+/* My ears: the crew member and Tests sit beside the result instead of on a row of their own. */
+.page-tools { float: right; padding-top: 6px; margin-left: 16px; position: relative; z-index: 1; }
+
+/* My ears in two columns on wide screens: the result and trend on the left, both cochleas on the right,
+   so the ears are visible without scrolling. */
+.page-tools { float: none; display: flex; justify-content: flex-end; align-items: center; gap: 14px; padding: 6px 0 10px; margin: 0; }
+@media (min-width: 900px) {
+  .ears-grid { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 28px; align-items: start; padding-top: 14px; max-width: none; }
+  .ears-grid .ears-verdict { margin-top: 0; }
+  .ears-grid .ears.two { max-width: none; gap: 12px; }
+  .ears-grid .trend { margin-top: 8px; }
+}

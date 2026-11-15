@@ -290,7 +290,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
         c.el.style.display = '';
         const cw = c.el.offsetWidth;
         const ch = c.el.offsetHeight;
-        const x = ((v.x + 1) / 2) * w - cw / 2;
+        // Keep clear of the map buttons on the right (and of the details panel when it's open).
+        const x = Math.max(8, Math.min(((v.x + 1) / 2) * w - cw / 2, w - offsetRef.current - 84 - cw));
         let y = ((1 - v.y) / 2) * h - ch - c.lift;
         const gap = 14; // room for the pointer under each callout
         for (let guard = 0; guard < 8; guard++) {

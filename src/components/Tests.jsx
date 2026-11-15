@@ -84,9 +84,7 @@ export default function Tests({ data, onDelete, onStartTest }) {
             <header>
               <h2>{title}</h2>
               <span className="muted">{when}</span>
-              {t.simulated && <span className="badge sim">Simulated</span>}
-              {inReference.has(t.id) && <span className="badge ref">In your reference</span>}
-              {badge && <span className={`badge ${badge[0]}`}>{badge[1]}</span>}
+              {badge && badge[0] !== 'quiet' && <span className={`warn-text ${badge[0]}`}>{badge[1]}</span>}
             </header>
             <p className="muted">
               {t.headphones || 'Headphones not recorded'}

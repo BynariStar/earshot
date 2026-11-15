@@ -31,26 +31,26 @@ function build(checks, extra = {}) {
 export const PERSONAS = [
   {
     id: 'steady', name: 'Crew member A', tag: 'Steady ears', age: 41, sex: 'male',
-    story: 'Baseline before launch, steady since. Shows prevention: what Earshot flags before anything goes wrong.',
+    story: 'Steady since launch. Shows prevention: earplug flags before anything changes.',
     state: () => build([[-30, 'baseline', {}], [-29, 'baseline', { right: { 1000: 5 } }], [30, 'check', { left: { 4000: 5 } }], [60, 'check', {}]]),
     truth: {},
   },
   {
     id: 'high', name: 'Crew member B', tag: 'Early high-pitch change', age: 47, sex: 'female',
-    story: 'A small change at 3 to 4 kHz in the left ear, the pattern noise causes, not yet a NASA shift. Earshot tightens their targets and checks after loud days.',
+    story: 'A small change at 3 to 4 kHz in the left ear, the pattern noise causes. Not yet a NASA shift.',
     state: () => build([[-30, 'baseline', {}], [-29, 'baseline', {}], [30, 'check', { left: { 4000: 5 } }], [60, 'check', { left: { 3000: 5, 4000: 7 } }]]),
     truth: { left: { 3000: 5, 4000: 7 } },
     afterNoise: { left: { 2000: 6, 3000: 10, 4000: 13 } }, // a temporary shift after loud noise (simulated)
   },
   {
     id: 'low', name: 'Crew member C', tag: 'Low-pitch shift', age: 47, sex: 'male',
-    story: "NASA's most common in-flight pattern: a low-pitch shift in one ear, cause unknown. Earshot points to pressure and fluid context, not noise.",
+    story: "A low-pitch shift in the left ear: NASA's most common in-flight pattern. Cause unknown.",
     state: () => ({ ...demoState(), demo: true }),
     truth: { left: { 250: 15, 500: 10 }, right: { 250: 5 } },
   },
   {
     id: 'sudden', name: 'Crew member D', tag: 'Sudden drop ahead', age: 52, sex: 'female',
-    story: 'Steady until today. Trigger "ringing in the right ear" from the Demo menu: the quick check finds a sudden drop and Earshot starts the intervention protocol.',
+    story: 'Steady until today. In the app, choose Demo, then Ringing in the right ear, to see the sudden-drop response.',
     state: () => build([[-30, 'baseline', {}], [-29, 'baseline', {}], [45, 'check', {}]]),
     truth: {},
     afterRinging: { right: { 1000: 15, 2000: 35, 3000: 40, 4000: 35 } },

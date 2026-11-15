@@ -173,7 +173,7 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 /* Sunday fixes: noise bypass, unmeasurable regions, test runner, My tests */
 .status-pill.unmeasurable { color: var(--muted); }
 .legend-item.unmeasurable::before { background: var(--unmeasurable); }
-.noisy-note { background: rgba(242, 153, 74, 0.12); border: 1px solid var(--shift); border-radius: 10px; padding: 8px 12px; color: var(--text); }
+.noisy-note { color: var(--shift); }
 .bypass { display: block; margin-top: 8px; color: var(--muted); font-size: 0.9rem; }
 .runner-count { margin: 6px 0 14px; }
 .row-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 16px 0; }
@@ -529,3 +529,7 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; margin-left:
 .trend .trend-end { fill: var(--text); font-size: 11px; }
 .region-panel h3 { margin: 0 0 6px; }
 .region-panel h4 { margin: 12px 0 2px; color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.station-choice { padding: 0 0 12px; overflow: hidden; }
+.station-choice img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; margin-bottom: 10px; }
+.station-choice strong, .station-choice span { padding: 0 14px; }
+.warn-text { color: var(--watch); font-size: 0.85rem; }

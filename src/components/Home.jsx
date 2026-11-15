@@ -20,7 +20,7 @@ const STATUS_TEXT = {
 };
 const RANK = { urgent: 4, shift: 3, watch: 2 };
 
-export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpenNormal }) {
+export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpenNormal, onOpenSudden }) {
   const [picked, setPicked] = useState(null);
   const baselines = baselineTests(data);
   const check = latestCheck(data);
@@ -105,6 +105,7 @@ export default function Home({ data, onStartTest, onLoadDemo, onExitDemo, onOpen
                 <h3>{e.title}</h3>
                 <p>{e.what}</p>
                 <ul>{e.actions.map((a) => <li key={a}>{a}</li>)}</ul>
+                {f.kind === 'sudden' && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
                 {f.kind !== 'sudden' && <ContextStrip rows={compareAll(f.averageDb, f.kind, inputs)} onMore={onOpenNormal} />}
               </article>
             );

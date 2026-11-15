@@ -23,7 +23,7 @@ function noResponseList(outcomes) {
   return out;
 }
 
-export default function TestFlow({ role, data, onSave, onDone }) {
+export default function TestFlow({ role, data, onSave, onDone, onOpenSudden }) {
   const profile = data.profile ?? {};
   const [stage, setStage] = useState('setup'); // setup | running | retest-offer | retesting | result
   const [headphones, setHeadphones] = useState(profile.headphones ?? '');
@@ -157,6 +157,7 @@ export default function TestFlow({ role, data, onSave, onDone }) {
                   <h3>{e.title}</h3>
                   <p>{e.what}</p>
                   <ul>{e.actions.map((a) => <li key={a}>{a}</li>)}</ul>
+                  {f.kind === 'sudden' && onOpenSudden && <button className="primary" onClick={onOpenSudden}>Open the sudden-drop response</button>}
                 </article>
               );
             })}

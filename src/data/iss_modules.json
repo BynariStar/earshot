@@ -178,6 +178,14 @@
       "id": "t2",
       "name": "T2 treadmill (at the runner's head)",
       "dba": 84.5,
+      "earplugsEffectiveDba": 70.3,
+      "source": "Allen & Danielson 2020, MMOP acoustics presentation (NEET worked example)",
+      "url": "https://ntrs.nasa.gov/api/citations/20200002173/downloads/20200002173.pdf"
+    },
+    {
+      "id": "ared",
+      "name": "ARED resistance exercise",
+      "dba": 66.3,
       "source": "Allen & Danielson 2020, MMOP acoustics presentation (NEET worked example)",
       "url": "https://ntrs.nasa.gov/api/citations/20200002173/downloads/20200002173.pdf"
     }
@@ -188,5 +196,14 @@
     "sleepTargetDba": 50,
     "hearingRestDba": 62,
     "source": "ISS Flight Rule B13-152 as summarized in Allen & Danielson 2020 and Allen 2024"
-  }
+  },
+  "backgrounds": [
+    {
+      "id": "us_general",
+      "name": "US segment, general",
+      "dba": 59.5,
+      "source": "Allen & Danielson 2020, MMOP acoustics presentation (NEET worked example)",
+      "url": "https://ntrs.nasa.gov/api/citations/20200002173/downloads/20200002173.pdf"
+    }
+  ]
 }

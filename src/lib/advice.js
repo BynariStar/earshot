@@ -15,9 +15,9 @@ export function explain(finding) {
         title: `Sudden drop in your ${ear}`,
         what: `Your hearing at ${freqText(finding.frequencies)} is ${atLeast(finding)}${Math.round(finding.worst)} dB worse than your baseline, confirmed by a retest. NASA defines a drop of 30 dB or more as sudden hearing loss.`,
         actions: [
-          'Tell your crew medical officer now. Sudden hearing loss is treated as time-sensitive.',
-          'Note any ear fullness, ringing, dizziness, recent pressure changes or new medication in the log.',
-          'The crew medical officer decides whether to contact the flight surgeon on the ground.',
+          'Tell your crew medical officer now. Sudden hearing loss is time-sensitive: treatment works best when started early.',
+          'Open the sudden-drop response: onset time, a 30-second hum test, red-flag questions and a summary for the flight surgeon.',
+          'Treatment decisions belong to the flight surgeon on the ground.',
         ],
         escalate: 'crew-medical-officer-now',
       };

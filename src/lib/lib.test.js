@@ -163,3 +163,56 @@ describe('dataset comparisons', () => {
     expect(compareAll(12, 'high', { age: 47, sex: 'male', years: 0.5, day: null, cognition: null, hearingShift: true })).toHaveLength(5);
   });
 });
+
+describe("NASA's full NEET worked example (Allen & Danielson 2020)", () => {
+  // T2 84.5 dBA 1 h, ARED 66.3 1.5 h, MRM1 65.3 2 h, Node 2 63.8 2 h, Node 1 60.2 1 h, US segment 59.5 8.5 h.
+  const rest = [
+    { dba: 66.3, minutes: 90 },
+    { dba: 65.3, minutes: 120 },
+    { dba: 63.8, minutes: 120 },
+    { dba: 60.2, minutes: 60 },
+    { dba: 59.5, minutes: 510 },
+  ];
+  it('gives 72.8 dBA without earplugs and 63.7 dBA with them (70.3 dBA effective)', () => {
+    // NASA reports one decimal place, so allow rounding (within 0.1 dB).
+    expect(Math.abs(workdayStatus([{ dba: 84.5, minutes: 60 }, ...rest]).leqDba - 72.8)).toBeLessThan(0.1);
+    expect(Math.abs(workdayStatus([{ dba: 70.3, minutes: 60 }, ...rest]).leqDba - 63.7)).toBeLessThan(0.1);
+  });
+});
+
+import { computePlan, setActivity, DEFAULT_PLAN, WORKDAY_MIN } from './plan.js';
+describe('activity-first workday plan', () => {
+  it('always fills exactly 16 hours, plus 8 of sleep', () => {
+    const r = computePlan(DEFAULT_PLAN);
+    expect(r.day.reduce((a, s) => a + s.minutes, 0)).toBe(WORKDAY_MIN);
+    expect(r.parts.find((p) => p.id === 'sleep').minutes).toBe(480);
+  });
+  it('trims an activity so the workday cannot overflow', () => {
+    let p = { ...DEFAULT_PLAN, activities: { t2: 0, ared: 0 } };
+    for (const id of ['t2', 'ared']) p = setActivity(p, id, 10000);
+    expect(p.activities.t2 + p.activities.ared).toBeLessThanOrEqual(WORKDAY_MIN);
+    expect(p.activities.t2).toBe(180);
+  });
+  it('shows the treadmill hour dominating the allowance', () => {
+    const r = computePlan({ ...DEFAULT_PLAN, activities: { t2: 60, ared: 0 } });
+    expect(r.top.id).toBe('t2');
+    expect(Math.round(r.top.dosePct)).toBe(112);
+  });
+});
+
+import { clinicalCriteria, windowStatus } from './sudden.js';
+describe('sudden-drop decision support', () => {
+  it('applies the clinical definition: 30 dB at three neighbouring pitches', () => {
+    const cur = flat(20);
+    cur.right[2000] = 55; cur.right[3000] = 60; cur.right[4000] = 50;
+    expect(clinicalCriteria(flat(20), cur, 'right')).toMatchObject({ met: true, frequencies: [2000, 3000, 4000] });
+    const two = flat(20);
+    two.right[1000] = 55; two.right[3000] = 55; two.right[4000] = 55;
+    expect(clinicalCriteria(flat(20), two, 'right').met).toBe(false);
+  });
+  it('places the day in the guideline windows', () => {
+    expect(windowStatus(1).phase).toBe('initial');
+    expect(windowStatus(20).phase).toBe('salvage');
+    expect(windowStatus(60).phase).toBe('late');
+  });
+});

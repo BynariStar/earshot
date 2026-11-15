@@ -9,7 +9,8 @@ import TestFlow from './components/TestFlow.jsx';
 import Planner from './components/Planner.jsx';
 import IsThisNormal from './components/IsThisNormal.jsx';
 import Tests from './components/Tests.jsx';
-import { load, save, clearAll, withoutTest } from './lib/storage.js';
+import SuddenResponse from './components/SuddenResponse.jsx';
+import { load, save, clearAll, withoutTest, latestCheck } from './lib/storage.js';
 import { loadPlan, savePlan, computePlan } from './lib/plan.js';
 import { demoState } from './lib/demo.js';
 import './App.css';
@@ -94,6 +95,9 @@ export default function App() {
 
   const back = section === 'test' ? () => go('ears') : () => go('');
   const earsTab = section === 'ears' ? sub || 'overview' : null;
+  const hasSudden = latestCheck(data)?.confirmedFindings?.some((f) => f.kind === 'sudden');
+  const earsTabs = [['overview', 'Overview'], ['tests', 'My tests'], ['normal', 'Is this normal?']];
+  if (hasSudden || data.demo || earsTab === 'sudden') earsTabs.push(['sudden', hasSudden ? 'Sudden drop: act now' : 'Sudden drop (example)']);
 
   return (
     <div className="app">
@@ -107,7 +111,7 @@ export default function App() {
 
       {section === 'ears' && (
         <div className="segmented tabs-ears" role="tablist" aria-label="My ears">
-          {[['overview', 'Overview'], ['tests', 'My tests'], ['normal', 'Is this normal?']].map(([k, label]) => (
+          {earsTabs.map(([k, label]) => (
             <button key={k} role="tab" aria-selected={earsTab === k} className={earsTab === k ? 'on' : ''} onClick={() => go(k === 'overview' ? 'ears' : `ears/${k}`)}>
               {label}
             </button>
@@ -117,11 +121,12 @@ export default function App() {
 
       <main>
         {earsTab === 'overview' && (
-          <Home data={data} onStartTest={startTest} onLoadDemo={loadDemo} onOpenNormal={() => go('ears/normal')} onExitDemo={exitDemo} />
+          <Home data={data} onStartTest={startTest} onLoadDemo={loadDemo} onOpenNormal={() => go('ears/normal')} onOpenSudden={() => go('ears/sudden')} onExitDemo={exitDemo} />
         )}
         {earsTab === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={startTest} />}
+        {earsTab === 'sudden' && <SuddenResponse data={data} onRetest={() => startTest('check')} />}
         {earsTab === 'normal' && <IsThisNormal data={data} onStartTest={() => startTest('baseline')} />}
-        {section === 'test' && <TestFlow key={sub} role={sub === 'baseline' ? 'baseline' : 'check'} data={data} onSave={saveTest} onDone={() => go('ears')} />}
+        {section === 'test' && <TestFlow key={sub} role={sub === 'baseline' ? 'baseline' : 'check'} data={data} onSave={saveTest} onDone={() => go('ears')} onOpenSudden={() => go('ears/sudden')} />}
         {section === 'station' && (
           <Suspense fallback={<p className="muted">Loading the station…</p>}>
             <Station />

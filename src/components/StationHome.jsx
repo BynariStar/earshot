@@ -14,7 +14,7 @@ const DEMO_EVENTS = [
 ];
 
 // A small popover that closes on outside click or Escape.
-function Popover({ label, button, children, className = '' }) {
+function Popover({ label, button, children, className = '', onOpen }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -30,7 +30,15 @@ function Popover({ label, button, children, className = '' }) {
   }, [open]);
   return (
     <div className={`popover ${className}`} ref={ref}>
-      <button className="icon-button" aria-label={label} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button
+        className="icon-button"
+        aria-label={label}
+        aria-expanded={open}
+        onClick={() => {
+          if (!open) onOpen?.();
+          setOpen((o) => !o);
+        }}
+      >
         {button}
       </button>
       {open && (
@@ -42,9 +50,21 @@ function Popover({ label, button, children, className = '' }) {
   );
 }
 
-export default function StationHome({ session, persona, alerts, go, focus, onEvent, onClearEvents, onChange, liveStart, onMoveMe }) {
+export default function StationHome({ session, persona, alerts, go, focus, onEvent, onClearEvents, onChange, liveStart, pausedAt, onTogglePause, onSeen, onDone, onMoveMe }) {
   const st = STATIONS[session.station];
-  const bell = alerts; // everything, most urgent first; popups also appear here after they've been seen
+  const key = (a) => `${a.id}:${a.title}`;
+  const bell = alerts.filter((a) => !(session.done ?? []).includes(key(a))); // most urgent first
+  const unseen = bell.filter((a) => !(session.bellSeen ?? []).includes(key(a)));
+  const [fresh, setFresh] = useState([]); // what was new when the bell was opened
+  const worst = unseen.some((x) => x.level === 'urgent') ? 'urgent' : unseen.some((x) => x.level === 'warn') ? 'warn' : 'info';
+  // P pauses or plays the simulated feed (for presenting).
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.key === 'p' || e.key === 'P') && !/input|select|textarea/i.test(e.target.tagName)) onTogglePause();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onTogglePause]);
   const act = (x) => (x.event ? onEvent(x.event) : go(x.to));
   const myEars = alerts.find((a) => a.id === 'baseline') ? 'Set your baseline' : 'Your hearing and quick checks';
   const flags = alerts.find((a) => a.id === 'flags');
@@ -59,12 +79,15 @@ export default function StationHome({ session, persona, alerts, go, focus, onEve
           </span>
         </div>
         <div className="head-tools">
-          <Popover label={`Notifications: ${bell.length}`} className="bell" button={<><BellIcon />{bell.length > 0 && <span className={`count ${bell.some((x) => x.level === 'urgent') ? 'urgent' : bell.some((x) => x.level === 'warn') ? 'warn' : 'info'}`}>{bell.length}</span>}</>}>
+          <Popover label={`Notifications: ${unseen.length} new`} className="bell" onOpen={() => { setFresh(unseen.map(key)); onSeen(bell.map(key)); }} button={<><BellIcon />{unseen.length > 0 && <span className={`count ${worst}`}>{unseen.length}</span>}</>}>
             {(close) => (
               <>
                 {bell.length === 0 && <p className="muted small">Nothing new.</p>}
                 {bell.map((a) => (
-                  <div key={a.id} className={`note ${a.level}`}>
+                  <div key={a.id} className={`note ${a.level}${fresh.includes(key(a)) ? ' new' : ''}`}>
+                    {a.dismissable && (
+                      <button className="done-btn" onClick={() => onDone(key(a))} aria-label={`Mark "${a.title}" as done`} title="Done">✓</button>
+                    )}
                     <strong>{a.level === 'urgent' && <span className="event-dot" aria-hidden="true" />}{a.title}</strong>
                     <span className="muted small">{a.body}</span>
                     {a.actions.map((x) => (
@@ -105,7 +128,7 @@ export default function StationHome({ session, persona, alerts, go, focus, onEve
       </header>
 
       <Suspense fallback={<p className="muted">Loading the station…</p>}>
-        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact liveStart={liveStart} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={onMoveMe} />
+        <Station key={session.station} lockedPlace={session.station} demoEvents={session.events} focus={focus} compact liveStart={liveStart} pausedAt={pausedAt} onTogglePause={onTogglePause} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={onMoveMe} />
       </Suspense>
 
       <nav className="home-nav" aria-label="Main">

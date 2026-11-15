@@ -106,9 +106,18 @@ function makeYouMarker() {
   return sprite;
 }
 
-export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null }) {
+export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null, offsetRight = 0 }) {
   const mountRef = useRef(null);
   const markerRef = useRef(null);
+  const camRef = useRef(null);
+  const offsetRef = useRef(offsetRight);
+  offsetRef.current = offsetRight;
+  // Keep the station centred in the part of the map a side panel leaves free.
+  const applyOffset = (cam, w, h) => {
+    const off = offsetRef.current;
+    if (off > 0 && w > off * 1.6) cam.setViewOffset(w, h, off / 2, 0, w, h);
+    else cam.clearViewOffset();
+  };
   const meshesRef = useRef({});
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -133,6 +142,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
 
     const scene = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(40, width / height, 0.5, 1000);
+    camRef.current = cam;
+    applyOffset(cam, width, height);
     cam.position.set(...camera);
     // Narrow screens: step the camera back so the whole station still fits.
     if (width / height < 1) cam.position.sub(new THREE.Vector3(...target)).multiplyScalar(Math.min(1.9, 0.9 / (width / height))).add(new THREE.Vector3(...target));
@@ -231,6 +242,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       if (!w || !h) return;
       renderer.setSize(w, h);
       cam.aspect = w / h;
+      applyOffset(cam, w, h);
       cam.updateProjectionMatrix();
     });
     ro.observe(mount);
@@ -254,6 +266,14 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parts, decor]);
+
+  useEffect(() => {
+    const cam = camRef.current;
+    const mount = mountRef.current;
+    if (!cam || !mount) return;
+    applyOffset(cam, mount.clientWidth, mount.clientHeight);
+    cam.updateProjectionMatrix();
+  }, [offsetRight]);
 
   // Move the "You" label to the top of the crew member's module.
   useEffect(() => {

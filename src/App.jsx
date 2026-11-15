@@ -114,6 +114,7 @@ export default function App() {
   useEffect(() => {
     if (!session) return undefined;
     const id = setInterval(() => {
+      if (session.pausedAt) return;
       const sec = (Date.now() - liveStart) / 1000;
       const hit = session.youAt ? liveHit(session.station, sec, session.youAt) : liveHit(session.station, sec);
       if (!hit || (session.events ?? []).some((e) => e.type === 'live' && e.key === hit.key)) return;
@@ -124,7 +125,17 @@ export default function App() {
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.station, session?.events, session?.youAt, liveStart]);
+  }, [session?.station, session?.events, session?.youAt, session?.pausedAt, liveStart]);
+  // Pause/play the simulated feed: freeze its clock, then shift its start by the pause.
+  const togglePause = () =>
+    changeSession((prev) =>
+      prev.pausedAt
+        ? { ...prev, liveStart: (prev.liveStart ?? APP_START) + (Date.now() - prev.pausedAt), pausedAt: null }
+        : { ...prev, liveStart: prev.liveStart ?? APP_START, pausedAt: Date.now() }
+    );
+  // The bell: opening it marks everything as seen; "done" removes an item until it changes.
+  const markSeen = (keys) => changeSession((prev) => ({ ...prev, bellSeen: [...new Set([...(prev.bellSeen ?? []), ...keys])] }));
+  const markDone = (key) => changeSession((prev) => ({ ...prev, done: [...new Set([...(prev.done ?? []), key])] }));
   const alerts = session
     ? buildAlerts({ station: session.station, data, events: session.events ?? [], plan: planResult, planFlags: flags.flagged, hearing, quick: data.quick ?? [] })
     : [];
@@ -150,7 +161,7 @@ export default function App() {
   const overlay = pageAlert && <AlertPage alert={pageAlert} onAct={(x) => actOnAlert(pageAlert, x)} onDismiss={() => dismissAlert(pageAlert)} />;
 
   function start(s) {
-    setSession({ ...s, seen: [], liveStart: Date.now() });
+    setSession({ ...s, seen: [], bellSeen: [], done: [], liveStart: Date.now(), pausedAt: null });
     if (s.persona === 'custom') clearSim('custom');
     setData(dataFor(s));
     go('');
@@ -159,7 +170,7 @@ export default function App() {
     changeSession((prev) => ({ ...prev, events: [...(prev.events ?? []).filter((x) => x.type !== e.type), { ...e, at: Date.now() }] }));
   }
   function clearEvents() {
-    setSession({ ...session, events: [], seen: [], liveStart: Date.now(), youAt: null });
+    setSession({ ...session, events: [], seen: [], bellSeen: [], done: [], liveStart: Date.now(), pausedAt: null, youAt: null });
     if (persona) {
       clearSim(session.persona);
       setData(dataFor(session));
@@ -201,6 +212,10 @@ export default function App() {
           onChange={() => go('welcome')}
           data={data}
           liveStart={liveStart}
+          pausedAt={session.pausedAt ?? null}
+          onTogglePause={togglePause}
+          onSeen={markSeen}
+          onDone={markDone}
           onMoveMe={(id) => changeSession((prev) => ({ ...prev, youAt: id }))}
         />
         {overlay}
@@ -245,7 +260,7 @@ export default function App() {
         {section === 'quick' && <QuickCheck key={sub} kind={sub || 'general'} data={data} persona={persona} events={session.events ?? []} onSave={saveQuick} onSimulatedFullCheck={simulatedFullCheck} go={go} />}
         {section === 'station' && (
           <Suspense fallback={<p className="muted">Loading the station…</p>}>
-            <Station demoEvents={session.events ?? []} liveStart={liveStart} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={(id) => changeSession((prev) => ({ ...prev, youAt: id }))} />
+            <Station demoEvents={session.events ?? []} liveStart={liveStart} pausedAt={session.pausedAt ?? null} onTogglePause={togglePause} youStation={session.station} youAt={session.youAt ?? null} onMoveMe={(id) => changeSession((prev) => ({ ...prev, youAt: id }))} />
           </Suspense>
         )}
         {section === 'about' && <About data={data} onReset={() => setData(dataFor(session))} />}

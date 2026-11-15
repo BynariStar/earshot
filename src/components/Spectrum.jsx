@@ -6,7 +6,7 @@ import { BANDS, spectrumOf, sourceNote, dominantBands, withFault, likelySource, 
 import { FAULT_SIGNATURE, FAULT_RISE_DB } from '../lib/alerts.js';
 
 // fault: true (the demo fault), { signature, rise } (a live incident), or nothing.
-export default function Spectrum({ id, fault }) {
+export default function Spectrum({ id, fault, hideSource = false }) {
   const f = fault === true ? { signature: FAULT_SIGNATURE, rise: FAULT_RISE_DB } : fault || null;
   const sp = spectrumOf(id);
   const sig = SIGNATURES.find((s) => s.id === (f?.signature ?? FAULT_SIGNATURE));
@@ -54,12 +54,13 @@ export default function Spectrum({ id, fault }) {
           );
         })}
       </svg>
-      {src && (
+      {src && !hideSource && (
         <p className="small fault-note">
           Likely source: <strong>{src.name.toLowerCase()}</strong>. The rise is at {src.bands.map(bandLabel).join(' and ')}.
         </p>
       )}
       <p className="small">Loudest for your ears at <strong>{dom.map((d) => bandLabel(d.band)).join(' and ')}</strong>.</p>
+      {sourceNote(id) && <p className="small"><span className="label-caps">NASA</span> {sourceNote(id)}</p>}
       <details className="source-note">
         <summary>Source</summary>
         <p className="muted small">
@@ -67,7 +68,7 @@ export default function Spectrum({ id, fault }) {
             ? `NASA publishes this module's noise only as a rating (NC-${sp.nc}); the dashed bars are that rating's curve, the most each band can be.`
             : "Read from the figures of NASA's 2024 ISS acoustics report (Allen, ICES-2024-354)."}
           {src ? ` ${src.basis}` : ''}
-          {sourceNote(id) ? ` NASA notes: ${sourceNote(id)}` : ''}
+
         </p>
       </details>
     </div>

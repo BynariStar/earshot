@@ -74,7 +74,7 @@ export default function IsThisNormal({ data, onStartTest }) {
       })}
       {data.demo && (
         <p className="muted">
-          Demo: the hearing record is simulated. The auditory-task history is the real record of CSA PRET volunteer #35 (2015), placed on the
+          Demo: the hearing record is simulated. The auditory-task history is the real record of one CSA PRET volunteer (2015), placed on the
           demo mission's timeline; the pairing is illustrative. The noise day is NASA's own worked example.
         </p>
       )}

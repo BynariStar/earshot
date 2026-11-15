@@ -49,7 +49,7 @@ export function demoState(launch = new Date()) {
   // simulated mission's timeline for the demo. Pairing them with the simulated hearing record is illustrative.
   const volunteer = pret.people.find((p) => p.participant === 35);
   const days = [-30, -29, 10, 20, 35, 50, 62, 75, 95, 105];
-  const cognition = volunteer.sessions.map((s, i) => ({ missionDay: days[i], level: s.highestLevelPassed, source: `CSA PRET volunteer #35, session ${s.session} (${s.date})` }));
+  const cognition = volunteer.sessions.map((s, i) => ({ missionDay: days[i], level: s.highestLevelPassed, source: `CSA PRET volunteer, session ${s.session} (${s.date})` }));
   return {
     profile: { headphones: 'Demo headphones', demo: true, age: 47, sex: 'male' },
     tests,

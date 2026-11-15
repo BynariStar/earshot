@@ -109,7 +109,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
   const cog = data.cognition?.length ? cognitionComparison(inputs.cognition, inputs.hearingShift) : null;
   const cogLine =
     cog?.level === 'flag'
-      ? 'Your auditory memory score dropped too. That is likely your hearing, not your thinking.'
+      ? 'Your auditory memory score dropped too. Your hearing changed as well, so rule it out before reading this as a change in thinking.'
       : cog?.level === 'watch' && data.cognition?.length
         ? 'Your auditory memory score dropped, but your hearing is steady, so hearing does not explain it.'
         : null;
@@ -143,7 +143,7 @@ export default function Home({ data, onStartTest, onOpenSudden, simulated, earpl
         {cogLine && (
           <p>
             {cogLine}
-            <Info>{`Canadian Space Agency PRET open data: ${cog.detail}`}</Info>
+            <Info>{`Canadian Space Agency PRET open data: ${cog.detail}${/volunteer/.test(data.cognition?.[0]?.source ?? '') ? ' Scores: the real record of one CSA PRET volunteer (2015), paired with this simulated hearing record.' : ''}`}</Info>
           </p>
         )}
         <div className="ears-actions">

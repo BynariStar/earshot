@@ -32,7 +32,7 @@ export default function About({ data, onReset }) {
       <ul>
         <li><strong>Not a medical device.</strong> A research prototype for NASA Space Apps 2026. It doesn't diagnose or treat anything; decisions stay with the crew medical officer and the flight surgeon.</li>
         <li><strong>Change, not absolute hearing.</strong> Consumer headphones aren't calibrated, so Earshot compares each test with your own baseline on the same headphones and volume, the way NASA compares in-flight tests. A change counts only if a retest repeats it (10 dB is about two standard deviations of portable-test error, Wexler et al. 2026).</li>
-        <li><strong>Simulated parts.</strong> The crew members, the live feed, the crew location and schedule, and the Moon and Mars bases are simulated from the NASA sources below and labelled in the app.</li>
+        <li><strong>Simulated parts.</strong> The crew members, the live feed, the crew location and schedule, and the Moon and Mars bases are simulated from the NASA sources below and labelled in the app. Crew member C's auditory memory scores are the real record of one CSA PRET volunteer (2015), paired with a simulated hearing record.</li>
         <li><strong>Your data stays here.</strong> Results are stored in this browser only. Nothing is uploaded.</li>
         <li><strong>AI-assisted.</strong> The code was largely written with Claude (Anthropic) and reviewed and directed by team Earshot, as the Space Apps rules require us to disclose.</li>
       </ul>

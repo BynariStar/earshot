@@ -119,7 +119,7 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, liveStart, pausedAt]);
-  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 700);
+  const [panelOpen, setPanelOpen] = useState(false); // opens on a tap; events show as callouts on the map
   const [hover, setHover] = useState(null);
   const [viewCtl, setViewCtl] = useState(false);
   const [showKey, setShowKey] = useState(false);
@@ -183,6 +183,14 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
   const hereLog = sel && live ? liveFrame(place, liveS, 60).log.filter((e) => e.inc.part === sel.id).slice(0, 4) : [];
   // The panel: "Now" in live view (or during a demo fault), a module's details when one is selected.
   const showPanel = !!sel || live || !!faultModule;
+  // Callouts: a small label above each module with something happening now; tapping one opens its details.
+  const shortLabel = (id) => partLabel(id).replace(/^Level \d · /, '').replace(/^.*\((.*)\)$/, '$1');
+  const callouts = [
+    ...(faultModule ? [{ id: faultModule, text: `${shortLabel(faultModule)}: louder than normal, +${faultDelta(faultModule).toFixed(1)} dBA` }] : []),
+    ...frame.active
+      .filter((inc) => inc.part !== faultModule)
+      .map((inc) => ({ id: inc.part, text: `${shortLabel(inc.part)}: ${inc.what.replace(/ started$/, '')}, ${inc.kind === 'activity' ? `${Math.round(levels[inc.part])} dBA` : `+${Math.round(levels[inc.part] - baseLv[inc.part])} dBA`}` })),
+  ];
   const panelShift = showPanel && panelOpen && wide ? 380 : 0;
   const incidentBox = selInc ? <LiveIncident inc={selInc} since={clockAt(selInc.since)} delta={levels[selInc.part] - baseLv[selInc.part]} place={place} /> : null;
   // The fault shown in a module's spectrum: the demo fault, or a live incident there.
@@ -256,12 +264,14 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           selected={selected}
           onSelect={pick}
           decor={base ? base.decor : place === 'iss' ? 'iss' : 'none'}
-          camera={base ? base.camera : place === 'iss' ? [52, 40, 66] : [13, 11, 15]}
+          camera={base ? base.camera : place === 'iss' ? [64, 49, 81] : [13, 11, 15]}
           target={base ? base.target : place === 'iss' ? [-5, -3, 0] : [0, 3, 0]}
           highlight={live ? highlights : faultModule ?? (base ? events.find((e) => base.parts.find((x) => x.id === e.id)?.kind === 'exercise')?.id : events[0]?.id === T2_MODULE ? T2_MODULE : undefined)}
           you={you}
           offsetRight={panelShift}
           viewRef={view}
+          callouts={panelOpen && sel ? [] : callouts}
+          onCallout={pick}
         />
 
         <div className="map-overlay map-tl">
@@ -299,6 +309,8 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
           </div>
         )}
         <div className="map-overlay map-r">
+          <button className={`map-icon key-btn${showKey ? ' on' : ''}`} onClick={() => setShowKey((v) => !v)} aria-pressed={showKey}>Key</button>
+          <button className={`map-icon${viewCtl ? ' on' : ''}`} onClick={() => setViewCtl((v) => !v)} aria-pressed={viewCtl} aria-label="Map buttons: turn and zoom">✥</button>
           {viewCtl && (
             <div className="view-ctl" role="group" aria-label="Map view controls">
               <button className="map-icon" onClick={() => view.current?.rotate(-1)} aria-label="Turn left">⟲</button>
@@ -308,8 +320,6 @@ export default function Station({ lockedPlace, demoEvents = [], focus = null, co
               <button className="map-icon" onClick={() => view.current?.reset()} aria-label="Reset view">⌂</button>
             </div>
           )}
-          <button className={`map-icon key-btn${showKey ? ' on' : ''}`} onClick={() => setShowKey((v) => !v)} aria-pressed={showKey}>Key</button>
-          <button className={`map-icon${viewCtl ? ' on' : ''}`} onClick={() => setViewCtl((v) => !v)} aria-pressed={viewCtl} aria-label="Map buttons: turn and zoom">✥</button>
         </div>
 
         {compact && timebar}

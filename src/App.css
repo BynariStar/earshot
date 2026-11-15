@@ -918,3 +918,23 @@ button:active:not(:disabled) { filter: brightness(1.25); transform: translateY(1
 .here-log summary::-webkit-details-marker { display: none; }
 .here-log summary::before { content: '›'; display: inline-block; transition: transform 0.15s; color: var(--muted); font-size: 1.2rem; }
 .here-log[open] summary::before { transform: rotate(90deg); }
+/* Callouts over modules with something happening now */
+.callout-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
+.callout { position: absolute; left: 0; top: 0; pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 48px; max-width: 280px; padding: 8px 12px; border-radius: 14px; border: 1px solid var(--urgent); background: color-mix(in srgb, var(--surface) 96%, transparent); color: var(--text); font: inherit; font-size: 0.92rem; text-align: left; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); cursor: pointer; }
+.callout::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg); background: inherit; border-right: 1px solid var(--urgent); border-bottom: 1px solid var(--urgent); }
+.callout-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--urgent); animation: event-pulse 1.6s ease-in-out infinite; }
+.callout-more { color: var(--muted); font-size: 1.1rem; }
+/* Map controls: fixed position so the move toggle never jumps; Key above it, controls open below */
+.map-r { top: 96px; transform: none; flex-direction: column; align-items: flex-end; }
+.map-r .view-ctl { flex-direction: column; gap: 8px; }
+.map-key { top: 96px; transform: none; }
+.day-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.day-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; text-align: left; }
+.day-row i { flex: none; width: 8px; align-self: stretch; border-radius: 4px; }
+.day-name { flex: 1; font-weight: 600; min-width: 0; }
+.day-meta { color: var(--muted); white-space: nowrap; }
+.day-tag { flex: none; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--watch) 20%, transparent); color: var(--watch); font-size: 0.85rem; font-weight: 600; }
+.day-row .chev { color: var(--muted); }
+.day-row.add { justify-content: center; border-style: dashed; background: none; }
+@media (max-width: 560px) { .day-row { flex-wrap: wrap; } .day-meta { order: 3; flex-basis: 100%; padding-left: 20px; } }
+.callout { white-space: nowrap; max-width: none; font-size: 0.9rem; transform-origin: 50% 100%; }

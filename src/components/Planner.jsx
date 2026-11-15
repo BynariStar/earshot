@@ -2,7 +2,9 @@
 // Reviewed and directed by the team. See AI_USE.md.
 // Plan my day: the answer first (which earplugs, and what that does to the day), then the day itself and the
 // numbers on request. The day is assumed to come from the crew schedule (simulated); the controls are for "what if".
+import { useState } from 'react';
 import { noiseColor } from '../lib/issLayout.js';
+import Sheet from './Sheet.jsx';
 import {
   ACTIVITIES, MAX_ACTIVITY_MIN, WORKDAY_MIN, PLUG_DB, T2, DEFAULT_FILL, DEFAULT_SLEEP, computePlan, applyFlags, setActivity, setPlaceMinutes, placeOptions, sleepOptions, normalize,
 } from '../lib/plan.js';
@@ -35,7 +37,10 @@ function DayBar({ result }) {
   );
 }
 
+const shortName = (n) => n.replace(' (earplugs)', '').replace(/^Level \d · /, '').replace(/^.*\((.*)\)$/, '$1');
+
 export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focus, alerts = [], events = [], go }) {
+  const [editing, setEditing] = useState(focus === 'sleep' ? { type: 'sleep' } : null);
   const plan = normalize(rawPlan);
   const target = TARGETS[hearingState(data).state];
   const { plan: flaggedPlan, flagged } = applyFlags(plan, target.protectAbove);
@@ -54,6 +59,7 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
   if (live && !flagged.some((f) => f.id === live.part)) earplugs.push(`${live.where.replace(/^.*\((.*)\)$/, '$1')} until it's fixed`);
   const exposure = alerts.find((a) => a.id === 'exposure');
   const sleepOk = r.sleepModule.dba <= 50;
+  const editTitle = !editing ? '' : { activity: editing.id === 't2' ? 'T2 treadmill' : 'ARED exercise', place: 'Place', fill: 'The rest of the workday', audio: 'Earphones', sleep: 'Where you sleep', add: 'Add to the day' }[editing.type];
   const quietest = [...sleeps].sort((a, b) => a.dba - b.dba)[0];
   const checks = [
     { ok: r.dosePct <= target.dosePct, text: `Noise allowance: ${pct}%`, note: target.dosePct < 100 ? `your target is ${target.dosePct}% while your ears change` : 'NASA limit 100%' },
@@ -142,92 +148,103 @@ export default function Planner({ plan: rawPlan, setPlan, data, lockedBase, focu
             </li>
           ))}
         </ul>
-        <DayBar result={r} />
         <p className="muted small">
-          From your crew schedule
-          <Info>The day comes from the crew schedule (simulated; Earshot assumes it is up to date). Change it below to try a different day.</Info>
+          From your crew schedule. Tap a line to change it.
+          <Info>The day comes from the crew schedule (simulated; Earshot assumes it is up to date). Change it here to try a different day.</Info>
         </p>
+        <div className="day-rows">
+          {r.day.map((seg) => {
+            const placeIndex = seg.kind === 'place' && seg.id !== 'fill' ? Number(seg.id.replace('place', '')) : null;
+            const edit = seg.kind === 'activity' ? { type: 'activity', id: seg.id } : seg.id === 'fill' ? { type: 'fill' } : { type: 'place', index: placeIndex };
+            return (
+              <button key={seg.id} className="day-row" onClick={() => setEditing(edit)}>
+                <i style={{ background: noiseColor(seg.rawDba) }} aria-hidden="true" />
+                <span className="day-name">{seg.id === 'fill' ? `The rest: ${shortName(seg.name)}` : seg.kind === 'activity' ? (seg.id === 't2' ? 'T2 treadmill' : 'ARED exercise') : shortName(seg.name)}</span>
+                <span className="day-meta">{hm(seg.minutes)} · {seg.rawDba} dBA</span>
+                {seg.protectedNow && <span className="day-tag">Earplugs</span>}
+                <span className="chev" aria-hidden="true">›</span>
+              </button>
+            );
+          })}
+          {plan.audio.minutes > 0 && (
+            <button className="day-row" onClick={() => setEditing({ type: 'audio' })}>
+              <i style={{ background: noiseColor(plan.audio.dba) }} aria-hidden="true" />
+              <span className="day-name">Earphones</span>
+              <span className="day-meta">{hm(plan.audio.minutes)} · {plan.audio.dba} dBA</span>
+              <span className="chev" aria-hidden="true">›</span>
+            </button>
+          )}
+          <button className="day-row" onClick={() => setEditing({ type: 'sleep' })}>
+            <i style={{ background: noiseColor(r.sleepModule.dba) }} aria-hidden="true" />
+            <span className="day-name">Sleep: {shortName(r.sleepModule.name)}</span>
+            <span className="day-meta">8 h · {r.sleepModule.dba} dBA</span>
+            <span className="chev" aria-hidden="true">›</span>
+          </button>
+          <button className="day-row add" onClick={() => setEditing({ type: 'add' })}>
+            <span className="day-name">+ Add to the day</span>
+          </button>
+        </div>
       </div>
 
-      <details className="plan-section" open={focus === 'sleep' || undefined}>
-        <summary>Change the day</summary>
-        <div className="planner-inputs">
-          <h4>Loud activities</h4>
-          {ACTIVITIES.map((a) => (
-            <Stepper
-              key={a.id}
-              label={`${a.id === 't2' ? 'T2 treadmill' : a.name} · ${a.dba} dBA`}
-              value={plan.activities[a.id] ?? 0}
-              step={15}
-              min={0}
-              max={MAX_ACTIVITY_MIN}
-              presets={[0, 30, 60, 90]}
-              onChange={(v) => setPlan(setActivity(plan, a.id, v))}
-            />
-          ))}
-
-          <h4>Where you'll work</h4>
-          {plan.places.map((pl, i) => (
-            <div key={i} className="place-block">
+      {editing && (
+        <Sheet title={editTitle} onClose={() => setEditing(null)}>
+          {editing.type === 'activity' && (
+            <>
+              <Stepper label="Time" value={plan.activities[editing.id] ?? 0} step={15} min={0} max={MAX_ACTIVITY_MIN} presets={[30, 60, 90]} format={hm} onChange={(v) => setPlan(setActivity(plan, editing.id, v))} />
+              <button className="secondary" onClick={() => { setPlan(setActivity(plan, editing.id, 0)); setEditing(null); }}>Remove from the day</button>
+            </>
+          )}
+          {editing.type === 'place' && plan.places[editing.index] && (
+            <>
               <Picker
                 label="Place"
-                value={pl.id}
+                value={plan.places[editing.index].id}
                 options={places.map((o) => ({ value: o.id, label: o.name, note: `${o.dba} dBA` }))}
-                onChange={(v) => set({ places: plan.places.map((x, j) => (j === i ? { ...x, id: v } : x)) })}
+                onChange={(v) => set({ places: plan.places.map((x, j) => (j === editing.index ? { ...x, id: v } : x)) })}
               />
-              <Stepper label="Time there" value={pl.minutes} step={30} min={0} max={480} presets={[60, 120, 240]} format={hm} onChange={(v) => setPlan(setPlaceMinutes(plan, i, v))} />
-              <button className="secondary" onClick={() => set({ places: plan.places.filter((_, j) => j !== i) })}>Remove this place</button>
-            </div>
-          ))}
-          <button className="secondary" disabled={left <= 0} onClick={() => setPlan(setPlaceMinutes({ ...plan, places: [...plan.places, { id: places[0].id, minutes: 0 }] }, plan.places.length, 120))}>
-            + Add a place
-          </button>
-          <div className="fill-block">
-            <Picker
-              label={`The rest (${hm(left)})`}
-              value={plan.fill}
-              options={places.map((o) => ({ value: o.id, label: o.name, note: `${o.dba} dBA` }))}
-              onChange={(v) => set({ fill: v })}
-            />
-          </div>
-          <h4>Earphones</h4>
-          {plan.audio.minutes > 0 ? (
-            <>
-              <Stepper label="Listening time" value={plan.audio.minutes} step={15} min={0} max={240} presets={[30, 60, 120]} onChange={(v) => set({ audio: { ...plan.audio, minutes: v } })} />
-              <Stepper label="Level at your ear (estimate)" value={plan.audio.dba} step={5} min={60} max={100} presets={[70, 80, 90]} unit="dBA" onChange={(v) => set({ audio: { ...plan.audio, dba: v } })} />
+              <Stepper label="Time there" value={plan.places[editing.index].minutes} step={30} min={0} max={480} presets={[60, 120, 240]} format={hm} onChange={(v) => setPlan(setPlaceMinutes(plan, editing.index, v))} />
+              <button className="secondary" onClick={() => { set({ places: plan.places.filter((_, j) => j !== editing.index) }); setEditing(null); }}>Remove from the day</button>
             </>
-          ) : (
-            <button className="secondary" onClick={() => set({ audio: { ...plan.audio, minutes: 60 } })}>+ Add earphones</button>
           )}
-          <h4>Sleep (8 h)</h4>
-          <Picker
-            startOpen={focus === 'sleep'}
-            label="Sleep in"
-            value={plan.sleepAt}
-            options={sleeps.map((m) => ({ value: m.id, label: m.name, note: `${m.dba} dBA` }))}
-            onChange={(v) => set({ sleepAt: v })}
-          />
-        </div>
-      </details>
-
-      <details className="plan-section">
-        <summary>Show the numbers</summary>
-        <div className="plan-numbers">
-          <p>
-            <strong>Noise allowance.</strong> NASA allows 8 hours at 75 dBA per 24 hours, and half that time for every 3 dB louder (NASA-STD-3001 [V2 6115]).
-            {r.top ? ` ${r.top.name} uses the most: ${Math.round(r.top.dosePct)}%.` : ''}
-            {r.dosePct <= 100 ? ` Room left: about ${hm(r.headroom(T2.dba))} of treadmill without earplugs.` : ''}
-          </p>
-          <p><strong>Workday.</strong> {r.work.leqDba.toFixed(1)} dBA over 16 hours. {STATUS[r.work.status].text} (Flight Rule B13-152).</p>
-          <p><strong>Sleep.</strong> {r.sleep.leqDba.toFixed(1)} dBA. {STATUS[r.sleep.status].text}.</p>
-          {flagged.length > 0 && <p><strong>Without the earplugs.</strong> {Math.round(skip.dosePct)}% of the allowance, workday {skip.work.leqDba.toFixed(1)} dBA. Earplugs count as {PLUG_DB.toFixed(1)} dB, from NASA's treadmill figure.</p>}
-          <p><strong>Real crews.</strong> NASA's crew dosimeters measured workdays of 68.7 to 70.8 dBA (Limardo et al. 2021).</p>
-          <p className="muted small">
-            Sources: activity levels and earplugs, Allen &amp; Danielson 2020; module levels, Allen 2024; limits, Flight Rule B13-152 and NASA-STD-3001 [V2 6115];
-            earphones, WHO-ITU H.870 (80 dB for 40 hours a week) and NASA-STD-3001 [V2 6106].
-          </p>
-        </div>
-      </details>
+          {editing.type === 'fill' && (
+            <Picker label={`The rest (${hm(left)})`} value={plan.fill} options={places.map((o) => ({ value: o.id, label: o.name, note: `${o.dba} dBA` }))} onChange={(v) => { set({ fill: v }); setEditing(null); }} />
+          )}
+          {editing.type === 'audio' && (
+            <>
+              <Stepper label="Listening time" value={plan.audio.minutes} step={15} min={0} max={240} presets={[30, 60, 120]} format={hm} onChange={(v) => set({ audio: { ...plan.audio, minutes: v } })} />
+              <Stepper label="Level at your ear (estimate)" value={plan.audio.dba} step={5} min={60} max={100} presets={[70, 80, 90]} unit="dBA" onChange={(v) => set({ audio: { ...plan.audio, dba: v } })} />
+              <button className="secondary" onClick={() => { set({ audio: { ...plan.audio, minutes: 0 } }); setEditing(null); }}>Remove from the day</button>
+            </>
+          )}
+          {editing.type === 'sleep' && (
+            <div className="rows">
+              {sleeps.map((m) => (
+                <button key={m.id} className={`row${m.id === plan.sleepAt ? ' on' : ''}`} onClick={() => { set({ sleepAt: m.id }); setEditing(null); }}>
+                  <span>{m.name} <span className="muted small">{m.dba} dBA</span></span>
+                  {m.id === plan.sleepAt && <span aria-hidden="true">✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {editing.type === 'add' && (
+            <div className="rows">
+              {ACTIVITIES.filter((a) => !(plan.activities[a.id] > 0)).map((a) => (
+                <button key={a.id} className="row" onClick={() => { setPlan(setActivity(plan, a.id, 60)); setEditing({ type: 'activity', id: a.id }); }}>
+                  <span>{a.id === 't2' ? 'T2 treadmill' : 'ARED exercise'} <span className="muted small">{a.dba} dBA</span></span>
+                </button>
+              ))}
+              <button className="row" disabled={left <= 0} onClick={() => { setPlan(setPlaceMinutes({ ...plan, places: [...plan.places, { id: places[0].id, minutes: 0 }] }, plan.places.length, 120)); setEditing({ type: 'place', index: plan.places.length }); }}>
+                <span>A place</span>
+              </button>
+              {plan.audio.minutes === 0 && (
+                <button className="row" onClick={() => { set({ audio: { ...plan.audio, minutes: 60 } }); setEditing({ type: 'audio' }); }}>
+                  <span>Earphones</span>
+                </button>
+              )}
+            </div>
+          )}
+        </Sheet>
+      )}
     </section>
   );
 }

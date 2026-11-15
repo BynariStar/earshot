@@ -106,10 +106,14 @@ function makeYouMarker() {
   return sprite;
 }
 
-export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null, offsetRight = 0, viewRef }) {
+export default function Station3D({ parts, levels, selected, onSelect, decor = 'iss', camera = [42, 34, 58], target = [-4, -2, 0], highlight, you = null, offsetRight = 0, viewRef, callouts = [], onCallout }) {
   const mountRef = useRef(null);
   const markerRef = useRef(null);
   const camRef = useRef(null);
+  const calloutsRef = useRef([]); // [{ id, el }]
+  const layerRef = useRef(null);
+  const onCalloutRef = useRef(onCallout);
+  onCalloutRef.current = onCallout;
   const offsetRef = useRef(offsetRight);
   offsetRef.current = offsetRight;
   // Keep the station centred in the part of the map a side panel leaves free.
@@ -247,6 +251,41 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     renderer.domElement.addEventListener('pointermove', onMove);
     renderer.domElement.addEventListener('pointerleave', onLeave);
 
+    // Callout layer: HTML labels pinned above modules, repositioned every frame.
+    const layer = document.createElement('div');
+    layer.className = 'callout-layer';
+    mount.appendChild(layer);
+    layerRef.current = layer;
+    const v = new THREE.Vector3();
+    const box = new THREE.Box3();
+    const placeCallouts = () => {
+      const w = renderer.domElement.clientWidth;
+      const h = renderer.domElement.clientHeight;
+      // Anchor each callout above its module, then push overlapping ones upward so none hides another.
+      const placed = [];
+      for (const c of calloutsRef.current) {
+        const mesh = meshes[c.id];
+        if (!mesh) continue;
+        box.setFromObject(mesh);
+        v.set((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2).project(cam);
+        if (v.z > 1) {
+          c.el.style.display = 'none';
+          continue;
+        }
+        c.el.style.display = '';
+        const cw = c.el.offsetWidth;
+        const ch = c.el.offsetHeight;
+        const x = ((v.x + 1) / 2) * w - cw / 2;
+        let y = ((1 - v.y) / 2) * h - ch - c.lift;
+        for (let guard = 0; guard < 6; guard++) {
+          const hit = placed.find((p) => x < p.x + p.w + 6 && p.x < x + cw + 6 && y < p.y + p.h + 6 && p.y < y + ch + 6);
+          if (!hit) break;
+          y = hit.y - ch - 8;
+        }
+        placed.push({ x, y, w: cw, h: ch });
+        c.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      }
+    };
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     let raf;
     const loop = (now = 0) => {
@@ -255,6 +294,7 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
         if (m && hi !== selectedRef.current) m.material.emissiveIntensity = still ? 0.6 : 0.15 + 0.6 * (0.5 + 0.5 * Math.sin(now / 260));
       }
       controls.update();
+      placeCallouts();
       renderer.render(scene, cam);
       raf = requestAnimationFrame(loop);
     };
@@ -280,6 +320,8 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerleave', onLeave);
       tip.remove();
+      layer.remove();
+      calloutsRef.current = [];
       scene.traverse((o) => {
         o.geometry?.dispose?.();
         o.material?.dispose?.();
@@ -297,6 +339,36 @@ export default function Station3D({ parts, levels, selected, onSelect, decor = '
     applyOffset(cam, mount.clientWidth, mount.clientHeight);
     cam.updateProjectionMatrix();
   }, [offsetRight]);
+
+  // Rebuild the callout elements only when which modules have one changes; update their text in place,
+  // so a live number ticking never replaces the button under the user's finger.
+  const calloutKey = callouts.map((c) => c.id).join(';');
+  useEffect(() => {
+    for (const c of calloutsRef.current) {
+      const t = callouts.find((x) => x.id === c.id)?.text;
+      const span = c.el.querySelector('.callout-text');
+      if (t && span.textContent !== t) span.textContent = t;
+    }
+  });
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    layer.innerHTML = '';
+    calloutsRef.current = callouts.map((c) => {
+      const el = document.createElement('button');
+      el.className = 'callout';
+      el.innerHTML = `<span class="callout-dot"></span><span class="callout-text"></span><span class="callout-more">›</span>`;
+      el.querySelector('.callout-text').textContent = c.text;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onCalloutRef.current?.(c.id);
+      });
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      layer.appendChild(el);
+      return { id: c.id, el, lift: c.id === you ? 58 : 12 };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calloutKey, parts, you]);
 
   // Move the "You" label to the top of the crew member's module.
   useEffect(() => {

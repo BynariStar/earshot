@@ -2,8 +2,8 @@
 // Reviewed and directed by the team. See AI_USE.md.
 import { describe, it, expect } from 'vitest';
 import { allowedMinutes, dose, leq, withProtection, workdayStatus, seriesToSegments, EARPLUG_EFFECTIVE_DB } from './noise.js';
-import { evaluate, confirm, averageBaselines, baselineAgreement, regionStatus } from './rules.js';
-import { createSearch, respond, simulate, MAX_LEVEL } from './threshold.js';
+import { evaluate, confirm, averageBaselines, baselineAgreement, regionStatus, regionStatusFor } from './rules.js';
+import { createSearch, respond, simulate, MAX_LEVEL, NO_RESPONSE_LEVEL } from './threshold.js';
 import lmlstp from '../data/lmlstp.json';
 
 describe('NASA noise dose [V2 6115]', () => {
@@ -50,7 +50,7 @@ describe('NASA shift rules', () => {
     cur.left[250] = 32;
     cur.left[500] = 28;
     const r = evaluate(flat(20), cur);
-    expect(r.findings).toEqual([{ kind: 'low', ear: 'left', averageDb: 10 }]);
+    expect(r.findings).toEqual([{ kind: 'low', ear: 'left', averageDb: 10, atLeast: false }]);
   });
   it('does not flag a 9 dB low-frequency average', () => {
     const cur = flat(20);
@@ -88,6 +88,22 @@ describe('NASA shift rules', () => {
     expect(averageBaselines(a, b).left[500]).toBe(22);
     expect(baselineAgreement(a, b)).toEqual([{ ear: 'right', frequency: 250, difference: 20 }]);
   });
+  it('still flags when a pitch becomes inaudible even at the cap', () => {
+    const base = flat(30);
+    base.left[4000] = 45;
+    const cur = flat(30);
+    cur.left[2000] = 45;
+    cur.left[3000] = 45;
+    cur.left[4000] = NO_RESPONSE_LEVEL;
+    const kinds = evaluate(base, cur).findings.map((f) => [f.kind, f.atLeast]);
+    expect(kinds).toEqual([['sudden', true], ['high', true]]);
+  });
+  it('treats an ear with no response at baseline as unmeasurable, not steady', () => {
+    expect(regionStatusFor(NO_RESPONSE_LEVEL, NO_RESPONSE_LEVEL)).toBe('unmeasurable');
+    expect(regionStatusFor(30, 41)).toBe('shift');
+    expect(regionStatusFor(30, undefined)).toBe('untested');
+    expect(evaluate(flat(NO_RESPONSE_LEVEL), flat(NO_RESPONSE_LEVEL)).findings).toEqual([]);
+  });
   it('colours regions by shift size', () => {
     expect(regionStatus(2)).toBe('ok');
     expect(regionStatus(7)).toBe('watch');
@@ -105,6 +121,16 @@ describe('threshold search', () => {
       s = respond(s, false);
     }
     expect(s.outcome).toBe('no-response');
+    expect(s.threshold).toBe(NO_RESPONSE_LEVEL);
+  });
+  it('reaches the cap in 4 tones for an ear that hears nothing (ASHA: +20, then +10)', () => {
+    let s = createSearch(1000, 'right');
+    const levels = [];
+    while (!s.done) {
+      levels.push(s.level);
+      s = respond(s, false);
+    }
+    expect(levels).toEqual([40, 60, 70, 80]);
   });
   it('lands within 5 dB of a simulated listener most of the time', () => {
     let seed = 42;

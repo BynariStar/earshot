@@ -6,7 +6,8 @@ import TestFlow from './components/TestFlow.jsx';
 import Station from './components/Station.jsx';
 import About from './components/About.jsx';
 import IsThisNormal from './components/IsThisNormal.jsx';
-import { load, save, clearAll } from './lib/storage.js';
+import Tests from './components/Tests.jsx';
+import { load, save, clearAll, withoutTest } from './lib/storage.js';
 import { demoState } from './lib/demo.js';
 import './App.css';
 
@@ -22,8 +23,22 @@ export default function App() {
     });
   }
 
+  function deleteTest(id) {
+    setData((d) => {
+      const next = withoutTest(d, id);
+      save(next);
+      return next;
+    });
+  }
+
+  function exitDemo() {
+    clearAll();
+    setData(load());
+  }
+
   const nav = [
     ['home', 'My ears'],
+    ['tests', 'My tests'],
     ['normal', 'Is this normal?'],
     ['station', 'Station noise'],
     ['about', 'Sources'],
@@ -55,14 +70,12 @@ export default function App() {
               setData(d);
             }}
             onOpenNormal={() => setView({ name: 'normal' })}
-            onExitDemo={() => {
-              clearAll();
-              setData(load());
-            }}
+            onExitDemo={exitDemo}
           />
         )}
         {view.name === 'test' && <TestFlow role={view.role} data={data} onSave={saveTest} onDone={() => setView({ name: 'home' })} />}
         {view.name === 'normal' && <IsThisNormal data={data} onStartTest={() => setView({ name: 'test', role: 'baseline' })} />}
+        {view.name === 'tests' && <Tests data={data} onDelete={deleteTest} onStartTest={(role) => setView({ name: 'test', role })} />}
         {view.name === 'station' && <Station />}
         {view.name === 'about' && <About data={data} onReset={() => setData(load())} />}
       </main>

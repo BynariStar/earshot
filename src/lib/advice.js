@@ -3,6 +3,7 @@
 // Plain-language meaning and next steps for each finding, with the escalation path
 // self-care -> crew medical officer -> flight surgeon on the ground.
 
+const atLeast = (f) => (f.atLeast ? 'at least ' : '');
 const freqText = (fs) => fs.map((f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`)).join(', ');
 
 export function explain(finding) {
@@ -12,7 +13,7 @@ export function explain(finding) {
       return {
         level: 'urgent',
         title: `Sudden drop in your ${ear}`,
-        what: `Your hearing at ${freqText(finding.frequencies)} is ${Math.round(finding.worst)} dB worse than your baseline, confirmed by a retest. NASA defines a drop of 30 dB or more as sudden hearing loss.`,
+        what: `Your hearing at ${freqText(finding.frequencies)} is ${atLeast(finding)}${Math.round(finding.worst)} dB worse than your baseline, confirmed by a retest. NASA defines a drop of 30 dB or more as sudden hearing loss.`,
         actions: [
           'Tell your crew medical officer now. Sudden hearing loss is treated as time-sensitive.',
           'Note any ear fullness, ringing, dizziness, recent pressure changes or new medication in the log.',
@@ -24,7 +25,7 @@ export function explain(finding) {
       return {
         level: 'shift',
         title: `Low-pitch shift in your ${ear}`,
-        what: `Your 250 and 500 Hz hearing averages ${finding.averageDb.toFixed(0)} dB worse than your baseline, confirmed by a retest. This matches NASA's low-frequency shift rule. NASA sees it in about 40% of in-flight tests and doesn't yet know the cause; fluid shifts and pressure inside the head are leading ideas.`,
+        what: `Your 250 and 500 Hz hearing averages ${atLeast(finding)}${finding.averageDb.toFixed(0)} dB worse than your baseline, confirmed by a retest. This matches NASA's low-frequency shift rule. NASA sees it in about 40% of in-flight tests and doesn't yet know the cause; fluid shifts and pressure inside the head are leading ideas.`,
         actions: [
           'Log context: ear fullness, congestion, headache, recent pressure changes.',
           'Retest tomorrow at the same time, in the same quiet place and headphones.',
@@ -36,7 +37,7 @@ export function explain(finding) {
       return {
         level: 'shift',
         title: `High-pitch shift in your ${ear}`,
-        what: `Your 2 to 4 kHz hearing averages ${finding.averageDb.toFixed(0)} dB worse than your baseline, confirmed by a retest. This matches NASA's high-frequency shift rule, the pattern noise exposure usually causes.`,
+        what: `Your 2 to 4 kHz hearing averages ${atLeast(finding)}${finding.averageDb.toFixed(0)} dB worse than your baseline, confirmed by a retest. This matches NASA's high-frequency shift rule, the pattern noise exposure usually causes.`,
         actions: [
           'Wear hearing protection for loud activities today (see the station view for which ones).',
           'Plan quiet time: sleep in a station at or below 50 dBA if you can; 62 dBA or less still counts as hearing rest.',

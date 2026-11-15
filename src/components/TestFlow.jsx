@@ -2,13 +2,26 @@
 // Reviewed and directed by the team. See AI_USE.md.
 import { useState } from 'react';
 import NoiseCheck from './NoiseCheck.jsx';
-import TestRunner, { TEST_ORDER } from './TestRunner.jsx';
+import TestRunner from './TestRunner.jsx';
+import { TEST_ORDER } from '../lib/testOrder.js';
 import { playReferenceTone, unlockAudio } from '../lib/audio.js';
 import { averageBaselines, baselineAgreement, evaluate, confirm } from '../lib/rules.js';
-import { baselineTests } from '../lib/storage.js';
+import { baselineTests, isNoisy } from '../lib/storage.js';
 import { explain } from '../lib/advice.js';
 
 const SYMPTOMS = ['Ear fullness or pressure', 'Ringing (tinnitus)', 'Dizziness', 'Congestion or cold', 'Recent pressure change (suit run, hatch, leak check)', 'New medication'];
+const EAR_CHOICES = [
+  ['both', 'Both ears', ['right', 'left']],
+  ['left', 'Left ear only', ['left']],
+  ['right', 'Right ear only', ['right']],
+];
+const fmt = (f) => (f >= 1000 ? `${f / 1000} kHz` : `${f} Hz`);
+
+function noResponseList(outcomes) {
+  const out = [];
+  for (const ear of ['left', 'right']) for (const f of TEST_ORDER) if (outcomes?.[ear]?.[f] === 'no-response') out.push(`${ear} ${fmt(f)}`);
+  return out;
+}
 
 export default function TestFlow({ role, data, onSave, onDone }) {
   const profile = data.profile ?? {};
@@ -16,7 +29,9 @@ export default function TestFlow({ role, data, onSave, onDone }) {
   const [headphones, setHeadphones] = useState(profile.headphones ?? '');
   const [age, setAge] = useState(profile.age ?? '');
   const [sex, setSex] = useState(profile.sex ?? '');
+  const [earChoice, setEarChoice] = useState(profile.earChoice ?? 'both');
   const [noise, setNoise] = useState(null);
+  const [bypass, setBypass] = useState(false);
   const [volumeSet, setVolumeSet] = useState(false);
   const [context, setContext] = useState([]);
   const [first, setFirst] = useState(null);
@@ -24,8 +39,15 @@ export default function TestFlow({ role, data, onSave, onDone }) {
 
   const baselines = baselineTests(data);
   const reference = baselines.length >= 2 ? averageBaselines(baselines[0].thresholds, baselines[1].thresholds) : null;
-  const ready = headphones.trim() && volumeSet && noise;
+  const noiseOk = noise && noise.pass;
+  const ready = headphones.trim() && volumeSet && noise && (noiseOk || bypass);
   const sameHeadphones = !profile.headphones || profile.headphones === headphones.trim();
+  const ears = EAR_CHOICES.find(([k]) => k === earChoice)[2];
+
+  function noiseRecord() {
+    if (!noise || noise.denied) return { checked: false, bypassed: bypass };
+    return { checked: true, pass: noise.pass, overall: noise.overall, low: noise.low, processingOn: noise.processingOn, bypassed: !noise.pass && bypass };
+  }
 
   function record(result, extra) {
     return {
@@ -33,7 +55,8 @@ export default function TestFlow({ role, data, onSave, onDone }) {
       date: new Date().toISOString(),
       role,
       headphones: headphones.trim(),
-      noise: noise?.denied ? { checked: false } : { checked: true, pass: noise?.pass, overall: noise?.overall, low: noise?.low },
+      ears,
+      noise: noiseRecord(),
       context,
       complete: true,
       ...result,
@@ -45,8 +68,8 @@ export default function TestFlow({ role, data, onSave, onDone }) {
     if (role === 'baseline') {
       const test = record(result);
       const problems = baselines.length === 1 ? baselineAgreement(baselines[0].thresholds, result.thresholds) : [];
-      onSave(test, { headphones: headphones.trim(), ...(age ? { age: Number(age) } : {}), ...(sex ? { sex } : {}) });
-      setOutcome({ kind: 'baseline', number: baselines.length + 1, problems, falseAlarms: result.falseAlarms });
+      onSave(test, { headphones: headphones.trim(), earChoice, ...(age ? { age: Number(age) } : {}), ...(sex ? { sex } : {}) });
+      setOutcome({ kind: 'baseline', number: baselines.length + 1, problems, falseAlarms: result.falseAlarms, test });
       setStage('result');
       return;
     }
@@ -54,8 +77,9 @@ export default function TestFlow({ role, data, onSave, onDone }) {
     setFirst({ result, ev });
     if (ev.findings.length) setStage('retest-offer');
     else {
-      onSave(record(result, { confirmedFindings: [] }));
-      setOutcome({ kind: 'check', confirmed: [], unconfirmed: [], falseAlarms: result.falseAlarms });
+      const test = record(result, { confirmedFindings: [] });
+      onSave(test);
+      setOutcome({ kind: 'check', confirmed: [], unconfirmed: [], falseAlarms: result.falseAlarms, test });
       setStage('result');
     }
   }
@@ -63,20 +87,21 @@ export default function TestFlow({ role, data, onSave, onDone }) {
   function onRetestComplete(result) {
     // Merge: the retest only covered the flagged ears; keep the first test's other values.
     const merged = { left: { ...first.result.thresholds.left }, right: { ...first.result.thresholds.right } };
-    const ears = [...new Set(first.ev.findings.map((f) => f.ear))];
-    for (const ear of ears) merged[ear] = { ...result.thresholds[ear] };
+    const flaggedEars = [...new Set(first.ev.findings.map((f) => f.ear))];
+    for (const ear of flaggedEars) merged[ear] = { ...result.thresholds[ear] };
     const retestEv = evaluate(reference, merged);
     const confirmed = confirm(first.ev, retestEv).map((f) => retestEv.findings.find((r) => r.kind === f.kind && r.ear === f.ear));
     const unconfirmed = first.ev.findings.filter((f) => !confirmed.some((c) => c.kind === f.kind && c.ear === f.ear));
-    onSave(record(first.result, { confirmedFindings: confirmed, unconfirmedFindings: unconfirmed, retest: { thresholds: result.thresholds, falseAlarms: result.falseAlarms } }));
-    setOutcome({ kind: 'check', confirmed, unconfirmed, falseAlarms: first.result.falseAlarms + result.falseAlarms });
+    const test = record(first.result, { confirmedFindings: confirmed, unconfirmedFindings: unconfirmed, retest: { thresholds: result.thresholds, outcomes: result.outcomes, falseAlarms: result.falseAlarms } });
+    onSave(test);
+    setOutcome({ kind: 'check', confirmed, unconfirmed, falseAlarms: first.result.falseAlarms + result.falseAlarms, test });
     setStage('result');
   }
 
-  if (stage === 'running') return <TestRunner onComplete={onFirstComplete} onCancel={onDone} />;
+  if (stage === 'running') return <TestRunner ears={ears} onComplete={onFirstComplete} onCancel={onDone} />;
   if (stage === 'retesting') {
-    const ears = [...new Set(first.ev.findings.map((f) => f.ear))];
-    return <TestRunner ears={ears} frequencies={TEST_ORDER} onComplete={onRetestComplete} onCancel={onDone} />;
+    const flaggedEars = [...new Set(first.ev.findings.map((f) => f.ear))];
+    return <TestRunner ears={flaggedEars} frequencies={TEST_ORDER} onComplete={onRetestComplete} onCancel={onDone} />;
   }
 
   if (stage === 'retest-offer') {
@@ -99,17 +124,26 @@ export default function TestFlow({ role, data, onSave, onDone }) {
   }
 
   if (stage === 'result') {
+    const noisy = isNoisy(outcome.test);
+    const nr = noResponseList(outcome.test.outcomes);
     return (
       <section className="panel">
+        {noisy && (
+          <p className="noisy-note">
+            {outcome.kind === 'baseline'
+              ? 'This baseline was measured without a passing noise check. Fine for trying things out, but redo it in a quiet place before relying on it (you can delete it under My tests).'
+              : 'This check was measured without a passing noise check. Treat any change as unreliable and retest somewhere quiet before acting on it.'}
+          </p>
+        )}
         {outcome.kind === 'baseline' ? (
           <>
             <h2>Baseline test {outcome.number} of 2 saved</h2>
             {outcome.number === 1 && <p>Take the second baseline test today, with the same headphones and volume. Earshot averages the two.</p>}
-            {outcome.number === 2 && outcome.problems.length === 0 && <p>Your two baselines agree within 10 dB at every pitch. Your personal reference is set.</p>}
-            {outcome.number === 2 && outcome.problems.length > 0 && (
+            {outcome.number >= 2 && outcome.problems.length === 0 && <p>Your two baselines agree within 10 dB at every pitch. Your personal reference is set.</p>}
+            {outcome.number >= 2 && outcome.problems.length > 0 && (
               <p className="warn">
-                Your two baselines differ by more than 10 dB at {outcome.problems.map((p) => `${p.ear} ${p.frequency} Hz`).join(', ')}. Check the
-                headphone fit and room noise; consider redoing the baseline.
+                Your two baselines differ by more than 10 dB at {outcome.problems.map((p) => `${p.ear} ${fmt(p.frequency)}`).join(', ')}. Check the
+                headphone fit and room noise; consider deleting one under My tests and redoing it.
               </p>
             )}
           </>
@@ -137,6 +171,11 @@ export default function TestFlow({ role, data, onSave, onDone }) {
             </p>
           </>
         )}
+        {nr.length > 0 && (
+          <p className="muted">
+            No response even at the loudest allowed level: {nr.join(', ')}. Recorded as "at least" that level, so a change there still counts.
+          </p>
+        )}
         {outcome.falseAlarms > 3 && <p className="muted">You pressed during silence {outcome.falseAlarms} times; results may be less reliable.</p>}
         <button className="primary" onClick={onDone}>Back to my cochlea</button>
       </section>
@@ -158,6 +197,18 @@ export default function TestFlow({ role, data, onSave, onDone }) {
           <p className="muted">Wired over-ear headphones are best. Turn off noise cancelling and any sound effects or equalizers.</p>
         </li>
         <li>
+          <p>Which ears?</p>
+          <div className="chips">
+            {EAR_CHOICES.map(([k, label]) => (
+              <label key={k} className={`chip${earChoice === k ? ' on' : ''}`}>
+                <input type="radio" name="ears" checked={earChoice === k} onChange={() => setEarChoice(k)} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <p className="muted">If you already know one ear doesn't hear, test only the other. Use the same choice for every test.</p>
+        </li>
+        <li>
           <p>Set your volume: play the reference tone and adjust your device volume until it is clearly audible but comfortable. Then leave the volume alone for every test.</p>
           <button className="secondary" onClick={async () => { await unlockAudio(); playReferenceTone('both'); }}>Play reference tone</button>{' '}
           <label className="inline">
@@ -165,7 +216,13 @@ export default function TestFlow({ role, data, onSave, onDone }) {
           </label>
         </li>
         <li>
-          <NoiseCheck onResult={setNoise} />
+          <NoiseCheck onResult={(r) => { setNoise(r); setBypass(false); }} />
+          {noise && !noise.pass && (
+            <label className="inline bypass">
+              <input type="checkbox" checked={bypass} onChange={(e) => setBypass(e.target.checked)} /> Bypass the noise check (troubleshooting or
+              demo). The result is saved as "measured in noise" and shouldn't be relied on.
+            </label>
+          )}
         </li>
         {role === 'baseline' && (
           <li>
@@ -196,7 +253,7 @@ export default function TestFlow({ role, data, onSave, onDone }) {
         )}
       </ol>
       <button className="primary" disabled={!ready} onClick={() => setStage('running')}>
-        {noise && !noise.pass ? 'Start anyway (result marked "noisy")' : 'Start test'}
+        {noiseOk ? 'Start test' : bypass ? 'Start test (marked "measured in noise")' : 'Start test'}
       </button>
       <button className="link-button" onClick={onDone}>Cancel</button>
     </section>

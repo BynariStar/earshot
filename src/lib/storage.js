@@ -39,3 +39,15 @@ export function latestCheck(state) {
   const checks = state.tests.filter((t) => t.role !== 'baseline' && t.complete);
   return checks[checks.length - 1] ?? null;
 }
+
+// A test counts as "measured in noise" if the noise check failed, was bypassed, or couldn't run.
+export function isNoisy(test) {
+  const n = test?.noise;
+  if (!n) return false;
+  return Boolean(n.bypassed) || n.checked === false || n.pass === false;
+}
+
+// Remove one test. If it was a baseline, the next baseline in line becomes part of the reference.
+export function withoutTest(state, id) {
+  return { ...state, tests: state.tests.filter((t) => t.id !== id) };
+}

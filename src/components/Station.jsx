@@ -149,6 +149,10 @@ export default function Station() {
           ))}
         </div>
         <ChamberChart series={chamber.series} />
+        <p className="muted chart-note">
+          Red dashed line: 72 dBA, the ISS flight-rule level (B13-152). It applies to the average over a 16-hour workday, not to single minutes,
+          so short peaks above it are not violations by themselves.
+        </p>
         <p>
           24-hour average <strong>{chamber.leq24hDba} dBA</strong>, loudest minute {chamber.maxDba} dBA, NASA dose{' '}
           <strong className={chamber.nasaDose24h > 100 ? 'over' : ''}>{chamber.nasaDose24h}</strong>
@@ -185,7 +189,7 @@ function ChamberChart({ series }) {
         </g>
       ))}
       <line x1={pad} x2={W - 8} y1={y(72)} y2={y(72)} className="limit" />
-      <text x={W - 10} y={y(72) - 4} textAnchor="end" className="axis limit-label">72 dBA workday limit</text>
+      <text x={pad + 4} y={y(72) + 13} textAnchor="start" className="axis limit-label">72</text>
       <path d={line} className="series" />
       <path d={doseLine} className="dose" />
       <text x={pad} y={H - 8} className="axis">0 h</text>

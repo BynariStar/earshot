@@ -11,6 +11,7 @@ const STATUS_COLOR = {
   watch: 'var(--watch)',
   shift: 'var(--shift)',
   urgent: 'var(--urgent)',
+  unmeasurable: 'var(--unmeasurable)',
 };
 
 const TURNS = 2.5;
